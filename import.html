@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>นำเข้าวัสดุ | โรงงานยางมะตอย</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="app-shell">
+<div class="sidebar" id="sidebar"></div>
+<div class="main-scroll">
+
+  <div class="topbar">
+    <p class="eyebrow">กันทรลักษ์ไทยนต์ · แพล้นยาง</p>
+    <h1>นำเข้าวัสดุ</h1>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2>บันทึกรับเข้า</h2>
+      <label>วันที่รับ</label>
+      <input type="date" id="imp_date">
+
+      <label>วัสดุ</label>
+      <select id="imp_material"></select>
+
+      <label>จำนวนที่รับเข้า</label>
+      <input type="text" inputmode="decimal" id="imp_amount" placeholder="0">
+
+      <label>บริษัทผู้ขาย</label>
+      <div class="inline-add">
+        <div><select id="imp_company"></select></div>
+        <button type="button" onclick="toggleAddRow('addCompanyRow')">+ เพิ่ม</button>
+      </div>
+      <div class="add-row" id="addCompanyRow">
+        <input type="text" id="newCompanyInput" placeholder="พิมพ์ชื่อบริษัทใหม่">
+        <button type="button" onclick="confirmAddCompany()">เพิ่ม</button>
+      </div>
+
+      <label>ทะเบียนรถ</label>
+      <div class="inline-add">
+        <div><select id="imp_plate"></select></div>
+        <button type="button" onclick="toggleAddRow('addPlateRow')">+ เพิ่ม</button>
+      </div>
+      <div class="add-row" id="addPlateRow">
+        <input type="text" id="newPlateInput" placeholder="เช่น กท 1234 อุบล">
+        <button type="button" onclick="confirmAddPlate()">เพิ่ม</button>
+      </div>
+
+      <label>ผู้บันทึก</label>
+      <input type="text" id="imp_by" placeholder="ชื่อผู้กรอก">
+
+      <button class="btn btn-primary" id="impBtn" onclick="submitImport()">บันทึกรับเข้า</button>
+    </div>
+
+    <div class="card">
+      <h2>ประวัติการนำเข้า</h2>
+      <table>
+        <thead><tr><th>วันที่</th><th>วัสดุ</th><th class="num">จำนวน</th><th>บริษัท</th><th>ทะเบียน</th><th class="actions"></th></tr></thead>
+        <tbody id="importTable"></tbody>
+      </table>
+      <button class="btn btn-dark" onclick="downloadImportSummary()">ดาวน์โหลดรูปสรุปการนำเข้า</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<nav class="navbar" id="navbar"></nav>
+
+<script src="/shared.js"></script>
+<script>
+renderNav('import');
+
+let materials = [];
+let importLogsCache = [];
+
+function findMat(code) { return materials.find((m) => m.code === code); }
+
+async function loadMaterials() {
+  materials = await apiFetch('/api/materials');
+  document.getElementById('imp_material').innerHTML = materials.map((m) =>
+    `<option value="${m.code}">${m.name} (${m.unit === 'ton' ? 'ตัน' : 'ลิตร'})</option>`
+  ).join('');
+}
+
+async function loadCompanies() {
+  const companies = await apiFetch('/api/companies');
+  document.getElementById('imp_company').innerHTML = companies.map((c) => `<option value="${c}">${c}</option>`).join('')
+    || '<option value="">ยังไม่มีบริษัท</option>';
+}
+
+async function loadPlates() {
+  const plates = await apiFetch('/api/plates');
+  document.getElementById('imp_plate').innerHTML = plates.map((p) => `<option value="${p}">${p}</option>`).join('')
+    || '<option value="">ยังไม่มีทะเบียน</option>';
+}
+
+function toggleAddRow(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) el.querySelector('input').focus();
+}
+
+async function confirmAddCompany() {
+  const input = document.getElementById('newCompanyInput');
+  const name = input.value.trim();
+  if (!name) { showToast('พิมพ์ชื่อบริษัทก่อน'); return; }
+  try {
+    await apiFetch('/api/companies', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
+    });
+    await loadCompanies();
+    document.getElementById('imp_company').value = name;
+    input.value = '';
+    document.getElementById('addCompanyRow').classList.remove('open');
+    showToast('เพิ่มบริษัทแล้ว');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function confirmAddPlate() {
+  const input = document.getElementById('newPlateInput');
+  const plate = input.value.trim();
+  if (!plate) { showToast('พิมพ์ทะเบียนก่อน'); return; }
+  try {
+    await apiFetch('/api/plates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plate })
+    });
+    await loadPlates();
+    document.getElementById('imp_plate').value = plate;
+    input.value = '';
+    document.getElementById('addPlateRow').classList.remove('open');
+    showToast('เพิ่มทะเบียนแล้ว');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function submitImport() {
+  const btn = document.getElementById('impBtn');
+  const date = document.getElementById('imp_date').value;
+  const code = document.getElementById('imp_material').value;
+  const amt = parseFloat(document.getElementById('imp_amount').value);
+  const company = document.getElementById('imp_company').value;
+  const plate = document.getElementById('imp_plate').value;
+  const by = document.getElementById('imp_by').value;
+
+  if (!Number.isFinite(amt) || amt <= 0) { showToast('กรอกจำนวนให้ถูกต้อง'); return; }
+
+  btn.disabled = true;
+  try {
+    await apiFetch('/api/receiving', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ material_code: code, amount: amt, company, plate, receiving_date: date, created_by: by })
+    });
+    showToast('บันทึกรับเข้าสำเร็จ');
+    document.getElementById('imp_amount').value = '';
+    await loadMaterials();
+    await renderImportTable();
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function renderImportTable() {
+  importLogsCache = await apiFetch('/api/logs/receiving');
+  document.getElementById('importTable').innerHTML = importLogsCache.map((r) => `
+    <tr>
+      <td>${new Date(r.receiving_date).toLocaleDateString('th-TH')}</td>
+      <td>${r.material_name}</td>
+      <td class="num">${fmt(r.amount, 0)} ${r.unit === 'ton' ? 'ตัน' : 'ล.'}</td>
+      <td>${r.company || '—'}</td>
+      <td>${r.plate ? `<span class="badge">${r.plate}</span>` : '—'}</td>
+      <td class="actions"><button class="del-btn" onclick="deleteImportLog(${r.id})" title="ลบรายการนี้">✕</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="6">ยังไม่มีข้อมูล</td></tr>';
+}
+
+async function deleteImportLog(id) {
+  if (!confirm('ลบรายการนี้และปรับสต็อกกลับหรือไม่?')) return;
+  try {
+    await apiFetch('/api/receiving/' + id, { method: 'DELETE' });
+    showToast('ลบรายการและปรับสต็อกกลับแล้ว');
+    await loadMaterials();
+    await renderImportTable();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function downloadImportSummary() {
+  if (importLogsCache.length === 0) { showToast('ยังไม่มีรายการนำเข้า'); return; }
+  const recent = importLogsCache.slice(0, 15);
+  const rows = recent.map((r) => [
+    `${r.material_name} · ${new Date(r.receiving_date).toLocaleDateString('th-TH')}`,
+    `${fmt(r.amount, 0)} ${r.unit === 'ton' ? 'ตัน' : 'ล.'} (${r.plate || '—'})`
+  ]);
+  const totals = {};
+  importLogsCache.forEach((r) => {
+    const key = r.material_name;
+    if (!totals[key]) totals[key] = { amt: 0, unit: r.unit === 'ton' ? 'ตัน' : 'ล.' };
+    totals[key].amt += Number(r.amount);
+  });
+  const totalRows = Object.entries(totals).map(([name, t]) => [name, fmt(t.amt, 0) + ' ' + t.unit]);
+  const sections = [
+    { heading: 'ยอดรวมตามวัสดุ', rows: totalRows },
+    { heading: `รายการล่าสุด (${recent.length} รายการ)`, rows }
+  ];
+  const canvas = buildReceiptCanvas('สรุปการนำเข้าวัสดุ', null, null, sections, 'นำเข้าวัสดุ · ' + todayStr());
+  triggerDownload(canvas, 'สรุปนำเข้า-' + todayStr() + '.png');
+}
+
+document.getElementById('imp_date').value = todayStr();
+
+(async function init() {
+  await loadMaterials();
+  await loadCompanies();
+  await loadPlates();
+  await renderImportTable();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "asphalt-stock-v2",
+  "version": "2.0.0",
+  "description": "ระบบตัดสต็อกโรงงานผลิตยางมะตอย",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
+    "pg": "^8.22.0"
+  }
+}

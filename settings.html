@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ตั้งค่า | โรงงานยางมะตอย</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="pin-screen" id="pinScreen">
+  <p class="eyebrow" style="color:var(--accent);font-family:'Roboto Mono',monospace;font-size:11px;letter-spacing:0.1em;">กันทรลักษ์ไทยนต์ · แพล้นยาง</p>
+  <h1 style="font-family:'Sora',sans-serif;font-weight:800;font-size:20px;margin:8px 0 0;">ใส่รหัส PIN</h1>
+  <div class="pin-dots" id="pinDots"></div>
+  <div class="pin-pad" id="pinPad"></div>
+  <p id="pinError" style="color:var(--danger);font-size:13px;height:18px;margin-top:14px;"></p>
+</div>
+
+<div id="mainSettings" style="display:none;">
+<div class="app-shell">
+<div class="sidebar" id="sidebar"></div>
+<div class="main-scroll">
+
+  <div class="topbar">
+    <p class="eyebrow">กันทรลักษ์ไทยนต์ · แพล้นยาง</p>
+    <h1>ตั้งค่า</h1>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2>ปรับสต็อกด้วยมือ</h2>
+      <p class="hint" style="margin-top:-6px;margin-bottom:10px;">ใช้ตอนตั้งสต็อกเริ่มต้น หรือแก้ให้ตรงของจริง</p>
+      <label>วัสดุ</label>
+      <select id="adj_material"></select>
+      <label>จำนวนที่ถูกต้อง (ยอดใหม่)</label>
+      <input type="text" inputmode="decimal" id="adj_value" placeholder="0">
+      <label>เหตุผล</label>
+      <input type="text" id="adj_reason" placeholder="เช่น ตั้งสต็อกเริ่มต้น / นับสต็อกประจำเดือน">
+      <button class="btn btn-dark" onclick="submitAdjust()">บันทึกปรับสต็อก</button>
+    </div>
+
+    <div class="card">
+      <h2>สูตร / เกณฑ์แจ้งเตือน</h2>
+      <div id="ratioList"></div>
+    </div>
+
+    <div class="card">
+      <h2>เปลี่ยนรหัส PIN</h2>
+      <label>รหัส PIN ใหม่ (อย่างน้อย 4 หลัก)</label>
+      <input type="password" id="new_pin" inputmode="numeric" pattern="[0-9]*">
+      <button class="btn btn-outline" onclick="changePin()">เปลี่ยนรหัส</button>
+    </div>
+  </div>
+
+</div>
+</div>
+<nav class="navbar" id="navbar"></nav>
+</div>
+
+<script src="/shared.js"></script>
+<script>
+let verifiedPin = null;
+let materials = [];
+let currentPin = '';
+
+function renderPinDots() {
+  const dots = document.getElementById('pinDots');
+  dots.innerHTML = '';
+  for (let i = 0; i < 4; i++) {
+    const d = document.createElement('div');
+    d.className = 'pin-dot' + (i < currentPin.length ? ' filled' : '');
+    dots.appendChild(d);
+  }
+}
+
+function renderPinPad() {
+  const pad = document.getElementById('pinPad');
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  pad.innerHTML = '';
+  keys.forEach((k) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = k;
+    if (k === '') btn.style.visibility = 'hidden';
+    btn.addEventListener('click', () => onPinKey(k));
+    pad.appendChild(btn);
+  });
+}
+
+async function onPinKey(k) {
+  if (k === '') return;
+  if (k === '⌫') { currentPin = currentPin.slice(0, -1); renderPinDots(); return; }
+  if (currentPin.length >= 4) return;
+  currentPin += k;
+  renderPinDots();
+  if (currentPin.length === 4) {
+    const data = await apiFetch('/api/settings/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: currentPin })
+    });
+    if (data.valid) {
+      verifiedPin = currentPin;
+      document.getElementById('pinScreen').style.display = 'none';
+      document.getElementById('mainSettings').style.display = 'block';
+      renderNav('settings');
+      initSettings();
+    } else {
+      document.getElementById('pinError').textContent = 'รหัสไม่ถูกต้อง ลองอีกครั้ง';
+      currentPin = '';
+      renderPinDots();
+    }
+  }
+}
+renderPinDots();
+renderPinPad();
+
+async function initSettings() {
+  materials = await apiFetch('/api/materials');
+  const opts = materials.map((m) => `<option value="${m.code}">${m.name} (${m.unit === 'ton' ? 'ตัน' : 'ลิตร'})</option>`).join('');
+  document.getElementById('adj_material').innerHTML = opts;
+  renderRatioList();
+}
+
+function renderRatioList() {
+  const el = document.getElementById('ratioList');
+  el.innerHTML = materials.map((m) => `
+    <div style="border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;">${m.name}</div>
+      <label style="margin-top:0;">อัตราส่วนคงที่ (ต่อ 1 ตัน) ${m.ratio_per_ton === null ? '— ไม่มีสูตรคงที่' : ''}</label>
+      <input type="text" inputmode="decimal" data-code="${m.code}" class="ratio-input" value="${m.ratio_per_ton ?? ''}" placeholder="เว้นว่างถ้าไม่ใช้สูตรคงที่">
+      <label>เกณฑ์แจ้งเตือนสต็อกต่ำ</label>
+      <input type="text" inputmode="decimal" data-code="${m.code}" class="alert-input" value="${m.low_stock_alert ?? 0}">
+      <button type="button" class="btn btn-outline" style="margin-top:10px;" onclick="saveRatio('${m.code}')">บันทึก ${m.name}</button>
+    </div>
+  `).join('');
+}
+
+async function saveRatio(code) {
+  const ratioInput = document.querySelector(`.ratio-input[data-code="${code}"]`);
+  const alertInput = document.querySelector(`.alert-input[data-code="${code}"]`);
+  try {
+    await apiFetch('/api/materials/' + code, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: verifiedPin, ratio_per_ton: ratioInput.value, low_stock_alert: alertInput.value })
+    });
+    showToast('บันทึกแล้ว');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function submitAdjust() {
+  const code = document.getElementById('adj_material').value;
+  const val = parseFloat(document.getElementById('adj_value').value);
+  const reason = document.getElementById('adj_reason').value;
+  if (!Number.isFinite(val) || val < 0) { showToast('กรอกจำนวนให้ถูกต้อง'); return; }
+  try {
+    await apiFetch('/api/adjust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: verifiedPin, material_code: code, new_value: val, reason })
+    });
+    showToast('ปรับสต็อกสำเร็จ');
+    document.getElementById('adj_value').value = '';
+    document.getElementById('adj_reason').value = '';
+    await initSettings();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function changePin() {
+  const newPin = document.getElementById('new_pin').value;
+  try {
+    await apiFetch('/api/settings/pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: verifiedPin, new_pin: newPin })
+    });
+    verifiedPin = newPin;
+    showToast('เปลี่ยนรหัส PIN สำเร็จ');
+    document.getElementById('new_pin').value = '';
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+</script>
+
+</body>
+</html>
