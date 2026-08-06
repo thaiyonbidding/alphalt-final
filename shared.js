@@ -166,11 +166,38 @@ function buildReceiptCanvas(title, heroLabel, heroValue, sections, footer) {
   return canvas;
 }
 
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function triggerDownload(canvas, filename) {
+  const dataUrl = canvas.toDataURL('image/png');
+
+  if (isIOS()) {
+    // iOS Safari ไม่รองรับการดาวน์โหลดอัตโนมัติผ่าน <a download> กับ data URL
+    // เปิดรูปเต็มจอแทน ให้ผู้ใช้กดค้างแล้วเลือก "บันทึกลงรูปภาพ" เอง
+    const win = window.open();
+    if (win) {
+      win.document.write(
+        '<html><head><title>' + filename + '</title></head>' +
+        '<body style="margin:0;background:#1C1B19;display:flex;align-items:center;justify-content:center;min-height:100vh;">' +
+        '<img src="' + dataUrl + '" style="max-width:100%;height:auto;display:block;">' +
+        '</body></html>'
+      );
+      showToast('กดค้างที่รูปแล้วเลือก "บันทึกลงรูปภาพ"');
+    } else {
+      showToast('เปิดหน้าต่างไม่สำเร็จ ลองอนุญาต pop-up แล้วลองใหม่');
+    }
+    return;
+  }
+
   const link = document.createElement('a');
   link.download = filename;
-  link.href = canvas.toDataURL('image/png');
+  link.href = dataUrl;
+  document.body.appendChild(link);
   link.click();
+  document.body.removeChild(link);
   showToast('ดาวน์โหลดรูปสรุปแล้ว');
 }
 
