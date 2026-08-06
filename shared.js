@@ -172,29 +172,37 @@ function isIOS() {
 }
 
 function triggerDownload(canvas, filename) {
-  const dataUrl = canvas.toDataURL('image/png');
+  canvas.toBlob(function (blob) {
+    if (!blob) { showToast('สร้างรูปไม่สำเร็จ ลองอีกครั้ง'); return; }
+    const file = new File([blob], filename, { type: 'image/png' });
+
+    // มือถือรุ่นใหม่ (iOS/Android) รองรับปุ่มแชร์ตรง ๆ เข้า LINE/แอปอื่นได้เลย
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: filename })
+        .then(() => showToast('แชร์รูปสำเร็จ'))
+        .catch((err) => {
+          if (err.name !== 'AbortError') fallbackImage(blob, filename);
+        });
+      return;
+    }
+    fallbackImage(blob, filename);
+  }, 'image/png');
+}
+
+function fallbackImage(blob, filename) {
+  const url = URL.createObjectURL(blob);
 
   if (isIOS()) {
-    // iOS Safari ไม่รองรับการดาวน์โหลดอัตโนมัติผ่าน <a download> กับ data URL
-    // เปิดรูปเต็มจอแทน ให้ผู้ใช้กดค้างแล้วเลือก "บันทึกลงรูปภาพ" เอง
-    const win = window.open();
-    if (win) {
-      win.document.write(
-        '<html><head><title>' + filename + '</title></head>' +
-        '<body style="margin:0;background:#1C1B19;display:flex;align-items:center;justify-content:center;min-height:100vh;">' +
-        '<img src="' + dataUrl + '" style="max-width:100%;height:auto;display:block;">' +
-        '</body></html>'
-      );
-      showToast('กดค้างที่รูปแล้วเลือก "บันทึกลงรูปภาพ"');
-    } else {
-      showToast('เปิดหน้าต่างไม่สำเร็จ ลองอนุญาต pop-up แล้วลองใหม่');
-    }
+    // เบราว์เซอร์รุ่นเก่าที่ไม่รองรับปุ่มแชร์ไฟล์ — เปิดรูปเต็มจอแทน
+    // กดปุ่มแชร์ของ Safari เอง (ไอคอนลูกศรชี้ขึ้น) หรือกดค้างที่รูปเพื่อบันทึก/แชร์ได้
+    window.open(url);
+    showToast('กดปุ่มแชร์ของเบราว์เซอร์ หรือกดค้างที่รูปเพื่อส่งเข้า LINE');
     return;
   }
 
   const link = document.createElement('a');
   link.download = filename;
-  link.href = dataUrl;
+  link.href = url;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
