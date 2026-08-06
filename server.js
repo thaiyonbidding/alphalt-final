@@ -37,7 +37,8 @@ async function getAdminPin() {
 
 function requirePin(req, res, next) {
   getAdminPin().then((pin) => {
-    if (req.body.pin === pin || req.headers['x-admin-pin'] === pin) {
+    const bodyPin = req.body && req.body.pin;
+    if (bodyPin === pin || req.headers['x-admin-pin'] === pin) {
       next();
     } else {
       res.status(401).json({ error: 'PIN ไม่ถูกต้อง' });
@@ -311,6 +312,26 @@ app.post('/api/plates', async (req, res) => {
   if (!plate || !plate.trim()) return res.status(400).json({ error: 'กรอกทะเบียนรถ' });
   try {
     await upsertPlate(plate.trim());
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/companies/:name', requirePin, async (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    await pool.query('DELETE FROM companies WHERE name = $1', [name]);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/plates/:plate', requirePin, async (req, res) => {
+  try {
+    const plate = decodeURIComponent(req.params.plate);
+    await pool.query('DELETE FROM vehicle_plates WHERE plate = $1', [plate]);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
