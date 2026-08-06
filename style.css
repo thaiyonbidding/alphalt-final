@@ -119,6 +119,8 @@ th.actions, td.actions { width: 34px; text-align: center; }
 .del-btn { background: none; border: none; color: var(--danger); font-size: 16px; cursor: pointer; padding: 2px 6px; line-height: 1; }
 .del-btn:hover { opacity: 0.7; }
 
+.sidebar { display: none; }
+
 .badge { display: inline-block; background: var(--card-soft); color: var(--ink); font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 8px; border: 1px solid var(--line); }
 
 .pin-screen { min-height: 80vh; display: flex; align-items: center; justify-content: center; flex-direction: column; background: var(--nav-dark); color: #fff; padding: 20px; text-align: center; }
@@ -145,7 +147,7 @@ th.actions, td.actions { width: 34px; text-align: center; }
 @media (min-width: 900px) {
   body { padding: 32px 16px; }
   .app-shell { max-width: 980px; margin: 0 auto; display: flex; align-items: stretch; background: var(--bg); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 34px rgba(0,0,0,0.08); }
-  .sidebar { width: 220px; flex-shrink: 0; background: var(--nav-dark); padding: 28px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .sidebar { display: flex; width: 220px; flex-shrink: 0; background: var(--nav-dark); padding: 28px 16px; flex-direction: column; gap: 4px; }
   .sidebar .brand { padding: 0 10px 22px; }
   .sidebar .brand .eyebrow { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; color: #8A8479; text-transform: uppercase; }
   .sidebar .brand h1 { font-family: var(--font-display); font-weight: 800; font-size: 17px; color: #fff; margin: 4px 0 0; }
