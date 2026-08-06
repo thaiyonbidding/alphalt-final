@@ -47,8 +47,14 @@ label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-so
 label:first-of-type { margin-top: 0; }
 
 input, select, textarea {
-  width: 100%; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 14px;
+  width: 100%; max-width: 100%; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: 14px;
   font-size: 16px; font-family: var(--font-body); background: var(--card-soft); color: var(--ink);
+  box-sizing: border-box;
+}
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
 }
 input:focus, select:focus { outline: none; border-color: var(--accent); }
 input[readonly] { color: var(--ink-soft); }
