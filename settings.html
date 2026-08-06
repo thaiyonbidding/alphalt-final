@@ -86,7 +86,8 @@ let currentPin = '';
 function renderPinDots() {
   const dots = document.getElementById('pinDots');
   dots.innerHTML = '';
-  for (let i = 0; i < 4; i++) {
+  const shown = Math.max(currentPin.length, 4);
+  for (let i = 0; i < shown; i++) {
     const d = document.createElement('div');
     d.className = 'pin-dot' + (i < currentPin.length ? ' filled' : '');
     dots.appendChild(d);
@@ -95,39 +96,43 @@ function renderPinDots() {
 
 function renderPinPad() {
   const pad = document.getElementById('pinPad');
-  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  const keys = ['1','2','3','4','5','6','7','8','9','✓','0','⌫'];
   pad.innerHTML = '';
   keys.forEach((k) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = k;
-    if (k === '') btn.style.visibility = 'hidden';
     btn.addEventListener('click', () => onPinKey(k));
     pad.appendChild(btn);
   });
 }
 
 async function onPinKey(k) {
-  if (k === '') return;
   if (k === '⌫') { currentPin = currentPin.slice(0, -1); renderPinDots(); return; }
-  if (currentPin.length >= 4) return;
+  if (k === '✓') { submitPin(); return; }
+  if (currentPin.length >= 10) return;
   currentPin += k;
   renderPinDots();
-  if (currentPin.length === 4) {
-    const data = await apiFetch('/api/settings/verify', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: currentPin })
-    });
-    if (data.valid) {
-      verifiedPin = currentPin;
-      document.getElementById('pinScreen').style.display = 'none';
-      document.getElementById('mainSettings').style.display = 'block';
-      renderNav('settings');
-      initSettings();
-    } else {
-      document.getElementById('pinError').textContent = 'รหัสไม่ถูกต้อง ลองอีกครั้ง';
-      currentPin = '';
-      renderPinDots();
-    }
+}
+
+async function submitPin() {
+  if (currentPin.length < 4) {
+    document.getElementById('pinError').textContent = 'กรอกรหัสให้ครบก่อน';
+    return;
+  }
+  const data = await apiFetch('/api/settings/verify', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: currentPin })
+  });
+  if (data.valid) {
+    verifiedPin = currentPin;
+    document.getElementById('pinScreen').style.display = 'none';
+    document.getElementById('mainSettings').style.display = 'block';
+    renderNav('settings');
+    initSettings();
+  } else {
+    document.getElementById('pinError').textContent = 'รหัสไม่ถูกต้อง ลองอีกครั้ง';
+    currentPin = '';
+    renderPinDots();
   }
 }
 renderPinDots();
