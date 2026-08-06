@@ -45,6 +45,26 @@
     </div>
 
     <div class="card">
+      <h2>รายชื่อบริษัทผู้ขาย</h2>
+      <p class="hint" style="margin-top:-6px;margin-bottom:10px;">ใช้ในดรอปดาวน์หน้านำเข้าวัสดุ</p>
+      <div id="companyList"></div>
+      <div class="inline-add" style="margin-top:10px;">
+        <div><input type="text" id="newCompanyName" placeholder="พิมพ์ชื่อบริษัทใหม่"></div>
+        <button type="button" onclick="addCompanyFromSettings()">+ เพิ่ม</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>รายชื่อทะเบียนรถ</h2>
+      <p class="hint" style="margin-top:-6px;margin-bottom:10px;">ใช้ในดรอปดาวน์หน้านำเข้าวัสดุ</p>
+      <div id="plateList"></div>
+      <div class="inline-add" style="margin-top:10px;">
+        <div><input type="text" id="newPlateName" placeholder="เช่น กท 1234 อุบล"></div>
+        <button type="button" onclick="addPlateFromSettings()">+ เพิ่ม</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>เปลี่ยนรหัส PIN</h2>
       <label>รหัส PIN ใหม่ (อย่างน้อย 4 หลัก)</label>
       <input type="password" id="new_pin" inputmode="numeric" pattern="[0-9]*">
@@ -118,6 +138,88 @@ async function initSettings() {
   const opts = materials.map((m) => `<option value="${m.code}">${m.name} (${m.unit === 'ton' ? 'ตัน' : 'ลิตร'})</option>`).join('');
   document.getElementById('adj_material').innerHTML = opts;
   renderRatioList();
+  await renderCompanyList();
+  await renderPlateList();
+}
+
+async function renderCompanyList() {
+  const companies = await apiFetch('/api/companies');
+  const el = document.getElementById('companyList');
+  el.innerHTML = companies.map((name) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--line);">
+      <span style="font-size:13.5px;">${name}</span>
+      <button class="del-btn" onclick="deleteCompany('${name.replace(/'/g, "\\'")}')" title="ลบ">✕</button>
+    </div>
+  `).join('') || '<p class="hint">ยังไม่มีรายชื่อบริษัท</p>';
+}
+
+async function addCompanyFromSettings() {
+  const input = document.getElementById('newCompanyName');
+  const name = input.value.trim();
+  if (!name) { showToast('พิมพ์ชื่อบริษัทก่อน'); return; }
+  try {
+    await apiFetch('/api/companies', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
+    });
+    input.value = '';
+    showToast('เพิ่มบริษัทแล้ว');
+    await renderCompanyList();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function deleteCompany(name) {
+  if (!confirm('ลบบริษัท "' + name + '" ออกจากรายชื่อหรือไม่?')) return;
+  try {
+    await apiFetch('/api/companies/' + encodeURIComponent(name), {
+      method: 'DELETE', headers: { 'x-admin-pin': verifiedPin }
+    });
+    showToast('ลบแล้ว');
+    await renderCompanyList();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function renderPlateList() {
+  const plates = await apiFetch('/api/plates');
+  const el = document.getElementById('plateList');
+  el.innerHTML = plates.map((plate) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--line);">
+      <span style="font-size:13.5px;">${plate}</span>
+      <button class="del-btn" onclick="deletePlate('${plate.replace(/'/g, "\\'")}')" title="ลบ">✕</button>
+    </div>
+  `).join('') || '<p class="hint">ยังไม่มีทะเบียนรถ</p>';
+}
+
+async function addPlateFromSettings() {
+  const input = document.getElementById('newPlateName');
+  const plate = input.value.trim();
+  if (!plate) { showToast('พิมพ์ทะเบียนรถก่อน'); return; }
+  try {
+    await apiFetch('/api/plates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plate })
+    });
+    input.value = '';
+    showToast('เพิ่มทะเบียนแล้ว');
+    await renderPlateList();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function deletePlate(plate) {
+  if (!confirm('ลบทะเบียน "' + plate + '" ออกจากรายชื่อหรือไม่?')) return;
+  try {
+    await apiFetch('/api/plates/' + encodeURIComponent(plate), {
+      method: 'DELETE', headers: { 'x-admin-pin': verifiedPin }
+    });
+    showToast('ลบแล้ว');
+    await renderPlateList();
+  } catch (err) {
+    showToast(err.message);
+  }
 }
 
 function renderRatioList() {
