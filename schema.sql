@@ -18,10 +18,10 @@ INSERT INTO materials (code, name, unit, ratio_per_ton, low_stock_alert, display
   ('stone_dust', 'หินฝุ่น',        'ton',   0.434, 100,  1),
   ('stone_34',   'หิน 3/4',        'ton',   0.267, 80,   2),
   ('stone_38',   'หิน 3/8',        'ton',   0.300, 80,   3),
-  ('asphalt_1',  'ยางมะตอย ถัง 1', 'liter', NULL,  2500, 4),
-  ('asphalt_2',  'ยางมะตอย ถัง 2', 'liter', NULL,  2500, 5),
-  ('asphalt_3',  'ยางมะตอย ถัง 3', 'liter', NULL,  2500, 6),
-  ('asphalt_4',  'ยางมะตอย ถัง 4', 'liter', NULL,  2500, 7),
+  ('asphalt_1',  'ถัง 1', 'liter', NULL,  2500, 4),
+  ('asphalt_2',  'ถัง 2', 'liter', NULL,  2500, 5),
+  ('asphalt_3',  'ถัง 3', 'liter', NULL,  2500, 6),
+  ('asphalt_4',  'ถัง 4', 'liter', NULL,  2500, 7),
   ('fuel_oil',   'น้ำมันเตา',      'liter', NULL,  800,  8),
   ('diesel',     'น้ำมันดีเซล',    'liter', NULL,  500,  9)
 ON CONFLICT (code) DO NOTHING;
@@ -100,3 +100,9 @@ INSERT INTO settings (key, value) VALUES
   ('admin_pin', '1234'),
   ('diesel_meter_fallback', '100000')
 ON CONFLICT (key) DO NOTHING;
+
+-- แก้ชื่อถังยางมะตอยให้สั้นลง (เผื่อระบบเคยรันไปแล้วมีชื่อเดิมค้างอยู่)
+UPDATE materials SET name = 'ถัง 1' WHERE code = 'asphalt_1';
+UPDATE materials SET name = 'ถัง 2' WHERE code = 'asphalt_2';
+UPDATE materials SET name = 'ถัง 3' WHERE code = 'asphalt_3';
+UPDATE materials SET name = 'ถัง 4' WHERE code = 'asphalt_4';
