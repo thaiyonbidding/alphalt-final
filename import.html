@@ -22,6 +22,7 @@
       <h2>บันทึกรับเข้า</h2>
       <label>วันที่รับ</label>
       <input type="date" id="imp_date">
+      <p class="hint" id="imp_date_hint"></p>
 
       <label>วัสดุ</label>
       <select id="imp_material" onchange="updateAmountLabel()"></select>
@@ -58,7 +59,20 @@
 
     <div class="card">
       <h2>ประวัติการนำเข้า</h2>
-      <table>
+      <p class="hint" style="margin-top:-6px;margin-bottom:10px;">เลือกช่วงวันที่เพื่อกรองตาราง/รูปสรุป (เว้นว่างไว้ = แสดงทั้งหมด)</p>
+      <label>ตั้งแต่วันที่</label>
+      <input type="date" id="filter_from">
+      <p class="hint" id="filter_from_hint"></p>
+      <label>ถึงวันที่</label>
+      <input type="date" id="filter_to">
+      <p class="hint" id="filter_to_hint"></p>
+      <div class="inline-add" style="margin-top:10px;">
+        <div></div>
+        <button type="button" onclick="setFilterThisMonth()">เดือนนี้</button>
+        <button type="button" onclick="clearFilter()">ล้างตัวกรอง</button>
+      </div>
+
+      <table style="margin-top:16px;">
         <thead><tr><th>วันที่</th><th>วัสดุ</th><th class="num">จำนวน</th><th>บริษัท</th><th>ทะเบียน</th><th class="actions"></th></tr></thead>
         <tbody id="importTable"></tbody>
       </table>
@@ -191,8 +205,40 @@ async function submitImport() {
   }
 }
 
+let allImportLogs = [];
+
+function getFilteredLogs() {
+  const from = document.getElementById('filter_from').value;
+  const to = document.getElementById('filter_to').value;
+  return allImportLogs.filter((r) => {
+    const d = r.receiving_date.slice(0, 10);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+}
+
+function setFilterThisMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('filter_from').value = first.toISOString().slice(0, 10);
+  document.getElementById('filter_to').value = todayStr();
+  attachDateHint('filter_from', 'filter_from_hint');
+  attachDateHint('filter_to', 'filter_to_hint');
+  renderImportTable();
+}
+
+function clearFilter() {
+  document.getElementById('filter_from').value = '';
+  document.getElementById('filter_to').value = '';
+  document.getElementById('filter_from_hint').textContent = '';
+  document.getElementById('filter_to_hint').textContent = '';
+  renderImportTable();
+}
+
 async function renderImportTable() {
-  importLogsCache = await apiFetch('/api/logs/receiving');
+  allImportLogs = await apiFetch('/api/logs/receiving');
+  importLogsCache = getFilteredLogs();
   document.getElementById('importTable').innerHTML = importLogsCache.map((r) => `
     <tr>
       <td>${new Date(r.receiving_date).toLocaleDateString('th-TH')}</td>
@@ -202,7 +248,7 @@ async function renderImportTable() {
       <td>${r.plate ? `<span class="badge">${r.plate}</span>` : '—'}</td>
       <td class="actions"><button class="del-btn" onclick="deleteImportLog(${r.id})" title="ลบรายการนี้">✕</button></td>
     </tr>
-  `).join('') || '<tr><td colspan="6">ยังไม่มีข้อมูล</td></tr>';
+  `).join('') || '<tr><td colspan="6">ไม่มีข้อมูลในช่วงที่เลือก</td></tr>';
 }
 
 async function deleteImportLog(id) {
@@ -218,7 +264,13 @@ async function deleteImportLog(id) {
 }
 
 function downloadImportSummary() {
-  if (importLogsCache.length === 0) { showToast('ยังไม่มีรายการนำเข้า'); return; }
+  if (importLogsCache.length === 0) { showToast('ไม่มีรายการในช่วงที่เลือก'); return; }
+  const from = document.getElementById('filter_from').value;
+  const to = document.getElementById('filter_to').value;
+  const periodLabel = (from || to)
+    ? `ช่วง ${from ? new Date(from).toLocaleDateString('th-TH') : 'เริ่มต้น'} – ${to ? new Date(to).toLocaleDateString('th-TH') : 'ปัจจุบัน'}`
+    : 'ทั้งหมด';
+
   const recent = importLogsCache.slice(0, 15);
   const rows = recent.map((r) => [
     `${r.material_name} · ${new Date(r.receiving_date).toLocaleDateString('th-TH')}`,
@@ -233,15 +285,20 @@ function downloadImportSummary() {
   const totalRows = Object.entries(totals).map(([name, t]) => [name, fmt(t.amt, t.isTon ? 2 : 0) + ' ' + t.unit]);
   const sections = [
     { heading: 'ยอดรวมตามวัสดุ', rows: totalRows },
-    { heading: `รายการล่าสุด (${recent.length} รายการ)`, rows }
+    { heading: `รายการล่าสุด (${recent.length} จาก ${importLogsCache.length} รายการ)`, rows }
   ];
-  const canvas = buildReceiptCanvas('สรุปการนำเข้าวัสดุ', null, null, sections, 'นำเข้าวัสดุ · ' + todayStr());
+  const canvas = buildReceiptCanvas('สรุปการนำเข้าวัสดุ', null, null, sections, periodLabel);
   triggerDownload(canvas, 'สรุปนำเข้า-' + todayStr() + '.png');
 }
 
 document.getElementById('imp_date').value = todayStr();
 
 (async function init() {
+  attachDateHint('imp_date', 'imp_date_hint');
+  attachDateHint('filter_from', 'filter_from_hint');
+  attachDateHint('filter_to', 'filter_to_hint');
+  document.getElementById('filter_from').addEventListener('change', renderImportTable);
+  document.getElementById('filter_to').addEventListener('change', renderImportTable);
   await loadMaterials();
   await loadCompanies();
   await loadPlates();

@@ -9,6 +9,24 @@ function parseNum(v) {
   return parseFloat(String(v).replace(/,/g, ''));
 }
 
+// ช่องวันที่ของเบราว์เซอร์ (type="date") จะโชว์รูปแบบตามภาษาเครื่อง ควบคุมไม่ได้ตรงๆ
+// ฟังก์ชันนี้เพิ่มข้อความกำกับใต้ช่อง ให้เห็นชัดว่าเป็น วัน/เดือน/ปี (พ.ศ.) แบบไทยเสมอ
+function attachDateHint(inputId, hintId) {
+  const input = document.getElementById(inputId);
+  const hint = document.getElementById(hintId);
+  if (!input || !hint) return;
+  function update() {
+    if (!input.value) { hint.textContent = ''; return; }
+    const d = new Date(input.value + 'T00:00:00');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    hint.textContent = `= ${dd}/${mm}/${yyyy} (พ.ศ. ${yyyy + 543})`;
+  }
+  input.addEventListener('input', update);
+  update();
+}
+
 function showToast(msg) {
   let t = document.getElementById('toast');
   if (!t) {

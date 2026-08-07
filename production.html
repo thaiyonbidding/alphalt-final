@@ -22,6 +22,7 @@
       <h2>สรุปปิดงานวันนี้</h2>
       <label>วันที่</label>
       <input type="date" id="entry_date">
+      <p class="hint" id="entry_date_hint"></p>
 
       <label>ผลิตรวมกี่ตัน</label>
       <input type="text" inputmode="decimal" id="tons_produced" placeholder="เช่น 50">
@@ -294,6 +295,7 @@ document.getElementById('tons_produced').addEventListener('input', updateCalc);
 document.getElementById('asphalt_ratio').addEventListener('input', updateCalc);
 document.getElementById('oil_end').addEventListener('input', updateCalc);
 document.getElementById('entry_date').value = todayStr();
+attachDateHint('entry_date', 'entry_date_hint');
 
 (async function init() {
   await loadMaterials();

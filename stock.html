@@ -26,6 +26,7 @@
       <p class="hint" style="margin-top:-6px;margin-bottom:10px;">แยกจากยอดผลิต ใช้จดเลขไมล์ตู้จ่ายน้ำมันประจำวัน</p>
       <label>วันที่</label>
       <input type="date" id="diesel_date">
+      <p class="hint" id="diesel_date_hint"></p>
       <label>เลขไมล์ ต้นวัน (ลิตร)</label>
       <input type="text" inputmode="decimal" id="diesel_start">
       <p class="hint">ดึงจากเลขไมล์สิ้นวันของรอบก่อนหน้าอัตโนมัติ แก้ไขได้ถ้าเลขไม่ตรง</p>
@@ -41,6 +42,23 @@
         <thead><tr><th>วันที่</th><th class="num">ตัน</th><th>หน้างาน</th><th class="actions"></th></tr></thead>
         <tbody id="prodTable"></tbody>
       </table>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <h2>สรุปยอดผลิตตามช่วงวันที่</h2>
+      <p class="hint" style="margin-top:-6px;margin-bottom:10px;">เลือกวันเดียว ทั้งเดือน หรือช่วงใดก็ได้ แล้วแชร์/ดาวน์โหลดเป็นรูปสรุป</p>
+      <label>ตั้งแต่วันที่</label>
+      <input type="date" id="prod_filter_from">
+      <p class="hint" id="prod_filter_from_hint"></p>
+      <label>ถึงวันที่</label>
+      <input type="date" id="prod_filter_to">
+      <p class="hint" id="prod_filter_to_hint"></p>
+      <div class="inline-add" style="margin-top:10px;">
+        <div></div>
+        <button type="button" onclick="setProdFilterToday()">วันนี้</button>
+        <button type="button" onclick="setProdFilterThisMonth()">เดือนนี้</button>
+      </div>
+      <button class="btn btn-dark" onclick="downloadProductionRangeSummary()">แชร์ / ดาวน์โหลดสรุปยอดผลิต</button>
     </div>
 
     <div class="card" style="margin-top:14px;">
@@ -206,11 +224,74 @@ async function deleteProdLog(id) {
   }
 }
 
+function setProdFilterToday() {
+  document.getElementById('prod_filter_from').value = todayStr();
+  document.getElementById('prod_filter_to').value = todayStr();
+  attachDateHint('prod_filter_from', 'prod_filter_from_hint');
+  attachDateHint('prod_filter_to', 'prod_filter_to_hint');
+}
+
+function setProdFilterThisMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('prod_filter_from').value = first.toISOString().slice(0, 10);
+  document.getElementById('prod_filter_to').value = todayStr();
+  attachDateHint('prod_filter_from', 'prod_filter_from_hint');
+  attachDateHint('prod_filter_to', 'prod_filter_to_hint');
+}
+
+async function downloadProductionRangeSummary() {
+  const from = document.getElementById('prod_filter_from').value;
+  const to = document.getElementById('prod_filter_to').value;
+  if (!from || !to) { showToast('เลือกวันที่เริ่มต้นและสิ้นสุดก่อน'); return; }
+
+  const rows = await apiFetch(`/api/logs/production?from=${from}&to=${to}`);
+  if (rows.length === 0) { showToast('ไม่มีข้อมูลการผลิตในช่วงที่เลือก'); return; }
+
+  let totalTons = 0, totalSd = 0, total34 = 0, total38 = 0, totalAsp = 0, totalOil = 0;
+  const tankTotals = {};
+  rows.forEach((r) => {
+    totalTons += Number(r.tons_produced);
+    totalSd += Number(r.stone_dust_used);
+    total34 += Number(r.stone_34_used);
+    total38 += Number(r.stone_38_used);
+    totalAsp += Number(r.asphalt_used);
+    totalOil += Number(r.oil_used || 0);
+    (r.tank_splits || []).forEach((s) => {
+      tankTotals[s.code] = (tankTotals[s.code] || 0) + Number(s.liters);
+    });
+  });
+
+  const tankRows = Object.entries(tankTotals).map(([code, liters]) => {
+    const mat = materials.find((m) => m.code === code);
+    return [mat ? mat.name : code, fmt(liters, 1) + ' ลิตร'];
+  });
+
+  const periodLabel = from === to
+    ? new Date(from).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })
+    : `${new Date(from).toLocaleDateString('th-TH')} – ${new Date(to).toLocaleDateString('th-TH')}`;
+
+  const sections = [
+    { heading: 'ข้อมูลทั่วไป', rows: [['จำนวนรอบผลิต', rows.length + ' รอบ']] },
+    { heading: 'วัตถุดิบหิน', rows: [
+      ['หินฝุ่น', fmt(totalSd, 2) + ' ตัน'],
+      ['หิน 3/4', fmt(total34, 2) + ' ตัน'],
+      ['หิน 3/8', fmt(total38, 2) + ' ตัน']
+    ]},
+    { heading: 'ยางมะตอย', rows: [['ยอดรวมที่ใช้', fmt(totalAsp, 1) + ' ลิตร'], ...tankRows] },
+    { heading: 'น้ำมันเตา', rows: [['ใช้ไปรวม', fmt(totalOil, 1) + ' ลิตร']] }
+  ];
+  const canvas = buildReceiptCanvas('สรุปยอดผลิต', 'รวมผลิต', fmt(totalTons, 0) + ' ตัน', sections, periodLabel);
+  triggerDownload(canvas, 'สรุปยอดผลิต-' + from + '-ถึง-' + to + '.png');
+}
+
 document.getElementById('diesel_end').addEventListener('input', updateDieselHint);
 document.getElementById('diesel_start').addEventListener('input', updateDieselHint);
 document.getElementById('diesel_date').value = todayStr();
 
 (async function init() {
+  attachDateHint('diesel_date', 'diesel_date_hint');
+  setProdFilterThisMonth();
   await renderStock();
   await renderProdTable();
   await loadDieselStart();
