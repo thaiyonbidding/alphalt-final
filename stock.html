@@ -248,24 +248,32 @@ async function downloadProductionRangeSummary() {
   const rows = await apiFetch(`/api/logs/production?from=${from}&to=${to}`);
   if (rows.length === 0) { showToast('ไม่มีข้อมูลการผลิตในช่วงที่เลือก'); return; }
 
-  let totalTons = 0, totalSd = 0, total34 = 0, total38 = 0, totalAsp = 0, totalOil = 0;
+  let totalTons = 0, totalSd = 0, total34 = 0, total38 = 0, totalAspKg = 0, totalOil = 0;
   const tankTotals = {};
   rows.forEach((r) => {
     totalTons += Number(r.tons_produced);
     totalSd += Number(r.stone_dust_used);
     total34 += Number(r.stone_34_used);
     total38 += Number(r.stone_38_used);
-    totalAsp += Number(r.asphalt_used);
+    totalAspKg += Number(r.asphalt_used);
     totalOil += Number(r.oil_used || 0);
     (r.tank_splits || []).forEach((s) => {
-      tankTotals[s.code] = (tankTotals[s.code] || 0) + Number(s.liters);
+      // รองรับทั้งฟอร์แมตใหม่ (start/end/used เป็นตัน) และเก่า (liters)
+      const usedTons = s.used !== undefined ? Number(s.used) : Number(s.liters || 0) / 960;
+      tankTotals[s.code] = (tankTotals[s.code] || 0) + usedTons;
     });
   });
 
-  const tankRows = Object.entries(tankTotals).map(([code, liters]) => {
+  const tankRows = Object.entries(tankTotals).map(([code, tons]) => {
     const mat = materials.find((m) => m.code === code);
-    return [mat ? mat.name : code, fmt(liters, 1) + ' ลิตร'];
+    return [mat ? mat.name : code, fmt(tons, 2) + ' ตัน'];
   });
+
+  const weightedTargetKg = rows.reduce((a, r) => a + Number(r.tons_produced) * Number(r.asphalt_ratio_per_ton), 0);
+  const diffKg = totalAspKg - weightedTargetKg;
+  const diffText = Math.abs(diffKg) < 5
+    ? `ตรงกับสูตร (${fmt(weightedTargetKg, 0)} กก.)`
+    : `${diffKg > 0 ? '+' : ''}${fmt(diffKg, 0)} กก. จากสูตร ${fmt(weightedTargetKg, 0)} กก.`;
 
   const periodLabel = from === to
     ? new Date(from).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -278,7 +286,8 @@ async function downloadProductionRangeSummary() {
       ['หิน 3/4', fmt(total34, 2) + ' ตัน'],
       ['หิน 3/8', fmt(total38, 2) + ' ตัน']
     ]},
-    { heading: 'ยางมะตอย', rows: [['ยอดรวมที่ใช้', fmt(totalAsp, 1) + ' ลิตร'], ...tankRows] },
+    { heading: 'ยางมะตอย', rows: [['ยอดรวมที่ใช้', fmt(totalAspKg, 0) + ' กก.'], ['เทียบกับสูตร', diffText]] },
+    { heading: 'ระดับถังยางมะตอย (รวมที่ใช้)', rows: tankRows },
     { heading: 'น้ำมันเตา', rows: [['ใช้ไปรวม', fmt(totalOil, 1) + ' ลิตร']] }
   ];
   const canvas = buildReceiptCanvas('สรุปยอดผลิต', 'รวมผลิต', fmt(totalTons, 0) + ' ตัน', sections, periodLabel);
