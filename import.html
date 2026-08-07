@@ -104,11 +104,11 @@ async function loadMaterials() {
 
 // วัสดุที่ต้องกรอกเป็นกิโลกรัมแล้วแปลงเป็นหน่วยสต็อกให้อัตโนมัติ
 // stone_dust/34/38: กก. -> ตัน (หาร 1000)
-// fuel_oil (น้ำมันเตา): กก. -> ลิตร (หาร 0.982 ตามความหนาแน่น)
+// fuel_oil (น้ำมันเตา): กก. -> ลิตร (หาร 0.93 ตามความหนาแน่น)
 function getKgConversionFactor(mat) {
   if (!mat) return null;
   if (mat.unit === 'ton') return 1000;
-  if (mat.code === 'fuel_oil') return 0.982;
+  if (mat.code === 'fuel_oil') return 0.93;
   return null;
 }
 
@@ -122,7 +122,7 @@ function updateAmountLabel() {
   if (factor) {
     label.textContent = 'จำนวนที่รับเข้า (กก.)';
     hint.textContent = mat.code === 'fuel_oil'
-      ? 'กรอกเป็นกิโลกรัม ระบบจะแปลงเป็นลิตรให้อัตโนมัติ (หาร 0.982)'
+      ? 'กรอกเป็นกิโลกรัม ระบบจะแปลงเป็นลิตรให้อัตโนมัติ (หาร 0.93)'
       : 'กรอกเป็นกิโลกรัมตามใบชั่ง ระบบจะแปลงเป็นตันให้อัตโนมัติ';
     hint.style.display = 'block';
   } else {
@@ -197,7 +197,7 @@ async function submitImport() {
   if (!Number.isFinite(rawAmt) || rawAmt <= 0) { showToast('กรอกจำนวนให้ถูกต้อง'); return; }
 
   const mat = findMat(code);
-  // แปลงจากกิโลกรัมเป็นหน่วยสต็อกจริงถ้าวัสดุนี้ต้องแปลง (หิน = หาร 1000, น้ำมันเตา = หาร 0.982)
+  // แปลงจากกิโลกรัมเป็นหน่วยสต็อกจริงถ้าวัสดุนี้ต้องแปลง (หิน = หาร 1000, น้ำมันเตา = หาร 0.93)
   const factor = getKgConversionFactor(mat);
   const amt = factor ? rawAmt / factor : rawAmt;
 
