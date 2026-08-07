@@ -288,24 +288,28 @@ function downloadImportSummary() {
     ? `ช่วง ${from ? new Date(from).toLocaleDateString('th-TH') : 'เริ่มต้น'} – ${to ? new Date(to).toLocaleDateString('th-TH') : 'ปัจจุบัน'}`
     : 'ทั้งหมด';
 
-  const recent = importLogsCache.slice(0, 15);
-  const rows = recent.map((r) => [
+  const ROWS_PER_PAGE = 35;
+  const allRows = importLogsCache.map((r) => [
     `${r.material_name} · ${new Date(r.receiving_date).toLocaleDateString('th-TH')}`,
     `${fmt(r.amount, getAmountDecimals(r))} ${getUnitLabel(r)} (${r.plate || '—'})`
   ]);
-  const totals = {};
-  importLogsCache.forEach((r) => {
-    const key = r.material_name;
-    if (!totals[key]) totals[key] = { amt: 0, unit: getUnitLabel(r), decimals: getAmountDecimals(r) };
-    totals[key].amt += Number(r.amount);
-  });
-  const totalRows = Object.entries(totals).map(([name, t]) => [name, fmt(t.amt, t.decimals) + ' ' + t.unit]);
-  const sections = [
-    { heading: 'ยอดรวมตามวัสดุ', rows: totalRows },
-    { heading: `รายการล่าสุด (${recent.length} จาก ${importLogsCache.length} รายการ)`, rows }
-  ];
-  const canvas = buildReceiptCanvas('สรุปการนำเข้าวัสดุ', null, null, sections, periodLabel);
-  triggerDownload(canvas, 'สรุปนำเข้า-' + todayStr() + '.png');
+
+  const pageCount = Math.ceil(allRows.length / ROWS_PER_PAGE);
+  const canvases = [];
+  for (let p = 0; p < pageCount; p++) {
+    const pageRows = allRows.slice(p * ROWS_PER_PAGE, (p + 1) * ROWS_PER_PAGE);
+    const pageTitle = pageCount > 1 ? `สรุปการนำเข้าวัสดุ (${p + 1}/${pageCount})` : 'สรุปการนำเข้าวัสดุ';
+    const sections = [
+      { heading: `รายการ (${importLogsCache.length} รายการทั้งหมด)`, rows: pageRows }
+    ];
+    canvases.push(buildReceiptCanvas(pageTitle, null, null, sections, periodLabel));
+  }
+
+  if (canvases.length === 1) {
+    triggerDownload(canvases[0], 'สรุปนำเข้า-' + todayStr() + '.png');
+  } else {
+    triggerMultiDownload(canvases, 'สรุปนำเข้า-' + todayStr());
+  }
 }
 
 document.getElementById('imp_date').value = todayStr();
