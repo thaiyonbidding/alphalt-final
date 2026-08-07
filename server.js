@@ -82,11 +82,12 @@ app.get('/api/materials', async (req, res) => {
 // ไม่มีดีเซลเกี่ยวข้อง
 // ============================================================
 app.post('/api/production', async (req, res) => {
-  const { production_date, tons_produced, asphalt_ratio_per_ton, tank_splits, oil_end, job_site, created_by } = req.body;
+  const { production_date, tons_produced, asphalt_ratio_per_ton, tank_ends, oil_end, job_site, created_by } = req.body;
 
   const tons = toNum(tons_produced);
-  const ratio = toNum(asphalt_ratio_per_ton);
+  const ratio = toNum(asphalt_ratio_per_ton); // กก. / ตัน
   const oilEnd = toNum(oil_end);
+  const TANK_CODES = ['asphalt_1', 'asphalt_2', 'asphalt_3', 'asphalt_4'];
 
   if (!production_date || !Number.isFinite(tons) || tons <= 0 || !Number.isFinite(ratio) || ratio < 0) {
     return res.status(400).json({ error: 'ข้อมูลไม่ครบหรือไม่ถูกต้อง (วันที่ / ตันที่ผลิต / อัตราส่วนยางมะตอย)' });
@@ -94,19 +95,16 @@ app.post('/api/production', async (req, res) => {
   if (!Number.isFinite(oilEnd) || oilEnd < 0) {
     return res.status(400).json({ error: 'กรอกระดับน้ำมันเตาสิ้นวันให้ถูกต้อง' });
   }
-  if (!Array.isArray(tank_splits) || tank_splits.length === 0) {
-    return res.status(400).json({ error: 'กรอกลิตรที่ใช้ในแต่ละถังยางมะตอยอย่างน้อย 1 ถัง' });
+  if (!tank_ends || typeof tank_ends !== 'object') {
+    return res.status(400).json({ error: 'กรอกระดับสิ้นวันของทั้ง 4 ถังให้ครบ' });
   }
-  const splits = tank_splits
-    .map((s) => ({ code: s.code, liters: toNum(s.liters) }))
-    .filter((s) => Number.isFinite(s.liters) && s.liters > 0);
-  if (splits.length === 0) {
-    return res.status(400).json({ error: 'กรอกลิตรที่ใช้ในแต่ละถังยางมะตอยอย่างน้อย 1 ถัง' });
-  }
-  for (const s of splits) {
-    if (!/^asphalt_[1-4]$/.test(s.code)) {
-      return res.status(400).json({ error: 'รหัสถังยางมะตอยไม่ถูกต้อง' });
+  const ends = {};
+  for (const code of TANK_CODES) {
+    const v = toNum(tank_ends[code]);
+    if (!Number.isFinite(v) || v < 0) {
+      return res.status(400).json({ error: 'กรอกระดับสิ้นวันของทั้ง 4 ถังให้ครบและถูกต้อง' });
     }
+    ends[code] = v;
   }
 
   const client = await pool.connect();
@@ -122,7 +120,24 @@ app.post('/api/production', async (req, res) => {
     const stoneDustUsed = tons * fixed.stone_dust;
     const stone34Used = tons * fixed.stone_34;
     const stone38Used = tons * fixed.stone_38;
-    const asphaltUsed = splits.reduce((a, s) => a + s.liters, 0);
+
+    const tankRes = await client.query(
+      `SELECT code, current_stock FROM materials WHERE code = ANY($1)`,
+      [TANK_CODES]
+    );
+    const tankReadings = [];
+    let totalUsedTons = 0;
+    for (const row of tankRes.rows) {
+      const start = Number(row.current_stock);
+      const end = ends[row.code];
+      if (end > start + 0.0001) {
+        throw new Error(`ระดับสิ้นวันของ${row.code}มากกว่าต้นวัน (ถังยางลดลงเท่านั้น เติมได้ผ่านหน้านำเข้าเท่านั้น)`);
+      }
+      const used = start - end;
+      totalUsedTons += used;
+      tankReadings.push({ code: row.code, start, end, used });
+    }
+    const asphaltUsedKg = totalUsedTons * 1000;
 
     const oilRes = await client.query(`SELECT current_stock FROM materials WHERE code = 'fuel_oil'`);
     const oilStart = Number(oilRes.rows[0].current_stock);
@@ -131,9 +146,8 @@ app.post('/api/production', async (req, res) => {
     await client.query(`UPDATE materials SET current_stock = current_stock - $1 WHERE code = 'stone_dust'`, [stoneDustUsed]);
     await client.query(`UPDATE materials SET current_stock = current_stock - $1 WHERE code = 'stone_34'`, [stone34Used]);
     await client.query(`UPDATE materials SET current_stock = current_stock - $1 WHERE code = 'stone_38'`, [stone38Used]);
-    for (const s of splits) {
-      const tonsToDeduct = s.liters / ASPHALT_LITERS_PER_TON;
-      await client.query(`UPDATE materials SET current_stock = current_stock - $1 WHERE code = $2`, [tonsToDeduct, s.code]);
+    for (const t of tankReadings) {
+      await client.query(`UPDATE materials SET current_stock = $1 WHERE code = $2`, [t.end, t.code]);
     }
     await client.query(`UPDATE materials SET current_stock = $1 WHERE code = 'fuel_oil'`, [oilEnd]);
 
@@ -141,11 +155,14 @@ app.post('/api/production', async (req, res) => {
       `INSERT INTO production_logs
         (production_date, tons_produced, asphalt_ratio_per_ton, stone_dust_used, stone_34_used, stone_38_used, asphalt_used, tank_splits, oil_start, oil_end, oil_used, job_site, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [production_date, tons, ratio, stoneDustUsed, stone34Used, stone38Used, asphaltUsed, JSON.stringify(splits), oilStart, oilEnd, oilUsed, job_site || null, created_by || null]
+      [production_date, tons, ratio, stoneDustUsed, stone34Used, stone38Used, asphaltUsedKg, JSON.stringify(tankReadings), oilStart, oilEnd, oilUsed, job_site || null, created_by || null]
     );
 
+    const targetKg = tons * ratio;
+    const diffKg = asphaltUsedKg - targetKg;
+
     await client.query('COMMIT');
-    res.json({ success: true, log: insertRes.rows[0] });
+    res.json({ success: true, log: insertRes.rows[0], targetKg, diffKg });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
@@ -170,8 +187,14 @@ app.delete('/api/production/:id', async (req, res) => {
     await client.query(`UPDATE materials SET current_stock = current_stock + $1 WHERE code = 'stone_38'`, [log.stone_38_used]);
     const splits = log.tank_splits || [];
     for (const s of splits) {
-      const tonsToRestore = s.liters / ASPHALT_LITERS_PER_TON;
-      await client.query(`UPDATE materials SET current_stock = current_stock + $1 WHERE code = $2`, [tonsToRestore, s.code]);
+      if (s.start !== undefined && s.end !== undefined) {
+        // รูปแบบใหม่: บันทึกระดับต้นวัน/สิ้นวันตรงๆ ต่อถัง -> คืนสต็อกกลับเป็นค่าต้นวัน
+        await client.query(`UPDATE materials SET current_stock = $1 WHERE code = $2`, [s.start, s.code]);
+      } else if (s.liters !== undefined) {
+        // รูปแบบเก่า: กรอกลิตรที่ใช้ต่อถัง -> คืนด้วยการแปลงลิตร/960
+        const tonsToRestore = s.liters / ASPHALT_LITERS_PER_TON;
+        await client.query(`UPDATE materials SET current_stock = current_stock + $1 WHERE code = $2`, [tonsToRestore, s.code]);
+      }
     }
     if (log.oil_start !== null) {
       await client.query(`UPDATE materials SET current_stock = $1 WHERE code = 'fuel_oil'`, [log.oil_start]);
