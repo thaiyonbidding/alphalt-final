@@ -214,6 +214,55 @@ function triggerDownload(canvas, filename) {
   }, 'image/png');
 }
 
+// สำหรับดาวน์โหลด/แชร์หลายรูปพร้อมกัน (เช่น ประวัติยาวเกิน 1 หน้า)
+// พยายามแชร์ทุกรูปพร้อมกันในครั้งเดียวก่อน (LINE เปิดให้เลือกส่งได้ทีเดียวหลายรูป)
+// ถ้าทำไม่ได้ ค่อย fallback เป็นดาวน์โหลด/เปิดทีละรูปตามลำดับ
+function triggerMultiDownload(canvases, baseFilename) {
+  const toBlobPromise = (canvas) => new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+
+  Promise.all(canvases.map(toBlobPromise)).then((blobs) => {
+    const validBlobs = blobs.filter(Boolean);
+    if (validBlobs.length === 0) { showToast('สร้างรูปไม่สำเร็จ ลองอีกครั้ง'); return; }
+
+    const files = validBlobs.map((blob, i) =>
+      new File([blob], `${baseFilename}-${i + 1}-${validBlobs.length}.png`, { type: 'image/png' })
+    );
+
+    if (navigator.canShare && navigator.canShare({ files })) {
+      navigator.share({ files, title: baseFilename })
+        .then(() => showToast(`แชร์ทั้ง ${files.length} รูปสำเร็จ`))
+        .catch((err) => {
+          if (err.name !== 'AbortError') fallbackMultiImage(validBlobs, baseFilename);
+        });
+      return;
+    }
+    fallbackMultiImage(validBlobs, baseFilename);
+  });
+}
+
+function fallbackMultiImage(blobs, baseFilename) {
+  if (isIOS()) {
+    // Safari รุ่นเก่าไม่รองรับแชร์หลายไฟล์พร้อมกัน — เปิดรูปแรกให้ก่อน
+    // (กรณีนี้พบน้อยมาก เพราะเบราว์เซอร์ส่วนใหญ่รองรับแชร์หลายรูปพร้อมกันแล้ว)
+    const url = URL.createObjectURL(blobs[0]);
+    window.open(url);
+    showToast(`มีทั้งหมด ${blobs.length} รูป เบราว์เซอร์นี้เปิดให้ได้ทีละรูป กดแชร์อีกครั้งเพื่อดูรูปถัดไป`);
+    return;
+  }
+  blobs.forEach((blob, i) => {
+    setTimeout(() => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `${baseFilename}-${i + 1}-${blobs.length}.png`;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, i * 300);
+  });
+  showToast(`ดาวน์โหลดทั้งหมด ${blobs.length} รูปแล้ว`);
+}
+
 function fallbackImage(blob, filename) {
   const url = URL.createObjectURL(blob);
 
