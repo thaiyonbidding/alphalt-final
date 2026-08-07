@@ -102,18 +102,31 @@ async function loadMaterials() {
   updateAmountLabel();
 }
 
+// วัสดุที่ต้องกรอกเป็นกิโลกรัมแล้วแปลงเป็นหน่วยสต็อกให้อัตโนมัติ
+// stone_dust/34/38: กก. -> ตัน (หาร 1000)
+// fuel_oil (น้ำมันเตา): กก. -> ลิตร (หาร 0.95 ตามความหนาแน่น)
+function getKgConversionFactor(mat) {
+  if (!mat) return null;
+  if (mat.unit === 'ton') return 1000;
+  if (mat.code === 'fuel_oil') return 0.95;
+  return null;
+}
+
 function updateAmountLabel() {
   const code = document.getElementById('imp_material').value;
   const mat = findMat(code);
   const label = document.getElementById('imp_amount_label');
   const hint = document.getElementById('imp_amount_hint');
   if (!mat) return;
-  if (mat.unit === 'ton') {
+  const factor = getKgConversionFactor(mat);
+  if (factor) {
     label.textContent = 'จำนวนที่รับเข้า (กก.)';
-    hint.textContent = 'กรอกเป็นกิโลกรัมตามใบชั่ง ระบบจะแปลงเป็นตันให้อัตโนมัติ';
+    hint.textContent = mat.code === 'fuel_oil'
+      ? 'กรอกเป็นกิโลกรัม ระบบจะแปลงเป็นลิตรให้อัตโนมัติ (หาร 0.95)'
+      : 'กรอกเป็นกิโลกรัมตามใบชั่ง ระบบจะแปลงเป็นตันให้อัตโนมัติ';
     hint.style.display = 'block';
   } else {
-    label.textContent = 'จำนวนที่รับเข้า (ลิตร)';
+    label.textContent = `จำนวนที่รับเข้า (${mat.unit === 'ton' ? 'ตัน' : 'ลิตร'})`;
     hint.style.display = 'none';
   }
 }
@@ -184,8 +197,9 @@ async function submitImport() {
   if (!Number.isFinite(rawAmt) || rawAmt <= 0) { showToast('กรอกจำนวนให้ถูกต้อง'); return; }
 
   const mat = findMat(code);
-  // วัสดุหน่วยตัน (หิน 3 ชนิด) ให้กรอกเป็นกิโลกรัมตามใบชั่ง แล้วแปลงเป็นตันก่อนส่งเข้าระบบ
-  const amt = (mat && mat.unit === 'ton') ? rawAmt / 1000 : rawAmt;
+  // แปลงจากกิโลกรัมเป็นหน่วยสต็อกจริงถ้าวัสดุนี้ต้องแปลง (หิน = หาร 1000, น้ำมันเตา = หาร 0.95)
+  const factor = getKgConversionFactor(mat);
+  const amt = factor ? rawAmt / factor : rawAmt;
 
   btn.disabled = true;
   try {
@@ -236,6 +250,9 @@ function clearFilter() {
   renderImportTable();
 }
 
+function getUnitLabel(r) { return r.unit === 'ton' ? 'ตัน' : 'ล.'; }
+function getAmountDecimals(r) { return (r.unit === 'ton' || r.material_code === 'fuel_oil') ? 2 : 0; }
+
 async function renderImportTable() {
   allImportLogs = await apiFetch('/api/logs/receiving');
   importLogsCache = getFilteredLogs();
@@ -243,7 +260,7 @@ async function renderImportTable() {
     <tr>
       <td>${new Date(r.receiving_date).toLocaleDateString('th-TH')}</td>
       <td>${r.material_name}</td>
-      <td class="num">${fmt(r.amount, r.unit === 'ton' ? 2 : 0)} ${r.unit === 'ton' ? 'ตัน' : 'ล.'}</td>
+      <td class="num">${fmt(r.amount, getAmountDecimals(r))} ${getUnitLabel(r)}</td>
       <td>${r.company || '—'}</td>
       <td>${r.plate ? `<span class="badge">${r.plate}</span>` : '—'}</td>
       <td class="actions"><button class="del-btn" onclick="deleteImportLog(${r.id})" title="ลบรายการนี้">✕</button></td>
@@ -274,15 +291,15 @@ function downloadImportSummary() {
   const recent = importLogsCache.slice(0, 15);
   const rows = recent.map((r) => [
     `${r.material_name} · ${new Date(r.receiving_date).toLocaleDateString('th-TH')}`,
-    `${fmt(r.amount, r.unit === 'ton' ? 2 : 0)} ${r.unit === 'ton' ? 'ตัน' : 'ล.'} (${r.plate || '—'})`
+    `${fmt(r.amount, getAmountDecimals(r))} ${getUnitLabel(r)} (${r.plate || '—'})`
   ]);
   const totals = {};
   importLogsCache.forEach((r) => {
     const key = r.material_name;
-    if (!totals[key]) totals[key] = { amt: 0, unit: r.unit === 'ton' ? 'ตัน' : 'ล.', isTon: r.unit === 'ton' };
+    if (!totals[key]) totals[key] = { amt: 0, unit: getUnitLabel(r), decimals: getAmountDecimals(r) };
     totals[key].amt += Number(r.amount);
   });
-  const totalRows = Object.entries(totals).map(([name, t]) => [name, fmt(t.amt, t.isTon ? 2 : 0) + ' ' + t.unit]);
+  const totalRows = Object.entries(totals).map(([name, t]) => [name, fmt(t.amt, t.decimals) + ' ' + t.unit]);
   const sections = [
     { heading: 'ยอดรวมตามวัสดุ', rows: totalRows },
     { heading: `รายการล่าสุด (${recent.length} จาก ${importLogsCache.length} รายการ)`, rows }
