@@ -19,7 +19,7 @@
 
   <div class="container">
     <div class="stock-grid" id="stockGrid">กำลังโหลด...</div>
-    <button class="btn btn-dark" onclick="downloadStockSummary()">ดาวน์โหลดรูปสรุปสต็อก</button>
+    <button class="btn btn-dark" onclick="downloadStockSummary()">แชร์ / ดาวน์โหลดรูปสรุปสต็อก</button>
 
     <div class="card" style="margin-top:14px;">
       <h2>บันทึกน้ำมันดีเซล (รถสิบล้อ)</h2>
@@ -108,12 +108,12 @@ function downloadStockSummary() {
 // ---------- Diesel ----------
 async function loadDieselStart() {
   const data = await apiFetch('/api/diesel/last');
-  document.getElementById('diesel_start').value = fmt(data.meter, 2);
+  document.getElementById('diesel_start').value = Number(data.meter).toFixed(2);
 }
 
 function updateDieselHint() {
-  const start = parseFloat(document.getElementById('diesel_start').value);
-  const end = parseFloat(document.getElementById('diesel_end').value);
+  const start = parseNum(document.getElementById('diesel_start').value);
+  const end = parseNum(document.getElementById('diesel_end').value);
   const hint = document.getElementById('dieselCheckHint');
   if (!Number.isFinite(end)) { hint.textContent = ''; return; }
   const used = end - start;
@@ -129,8 +129,8 @@ function updateDieselHint() {
 async function submitDiesel() {
   const btn = document.getElementById('dieselBtn');
   const date = document.getElementById('diesel_date').value;
-  const start = parseFloat(document.getElementById('diesel_start').value);
-  const end = parseFloat(document.getElementById('diesel_end').value);
+  const start = parseNum(document.getElementById('diesel_start').value);
+  const end = parseNum(document.getElementById('diesel_end').value);
 
   if (!date || !Number.isFinite(start) || !Number.isFinite(end) || end < start) {
     showToast('กรอกเลขไมล์ให้ถูกต้อง (สิ้นวันต้องมากกว่าต้นวัน)');

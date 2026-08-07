@@ -24,10 +24,11 @@
       <input type="date" id="imp_date">
 
       <label>วัสดุ</label>
-      <select id="imp_material"></select>
+      <select id="imp_material" onchange="updateAmountLabel()"></select>
 
-      <label>จำนวนที่รับเข้า</label>
+      <label id="imp_amount_label">จำนวนที่รับเข้า</label>
       <input type="text" inputmode="decimal" id="imp_amount" placeholder="0">
+      <p class="hint" id="imp_amount_hint" style="display:none;"></p>
 
       <label>บริษัทผู้ขาย</label>
       <div class="inline-add">
@@ -61,7 +62,7 @@
         <thead><tr><th>วันที่</th><th>วัสดุ</th><th class="num">จำนวน</th><th>บริษัท</th><th>ทะเบียน</th><th class="actions"></th></tr></thead>
         <tbody id="importTable"></tbody>
       </table>
-      <button class="btn btn-dark" onclick="downloadImportSummary()">ดาวน์โหลดรูปสรุปการนำเข้า</button>
+      <button class="btn btn-dark" onclick="downloadImportSummary()">แชร์ / ดาวน์โหลดรูปสรุปการนำเข้า</button>
     </div>
   </div>
 
@@ -84,6 +85,23 @@ async function loadMaterials() {
   document.getElementById('imp_material').innerHTML = materials.map((m) =>
     `<option value="${m.code}">${m.name} (${m.unit === 'ton' ? 'ตัน' : 'ลิตร'})</option>`
   ).join('');
+  updateAmountLabel();
+}
+
+function updateAmountLabel() {
+  const code = document.getElementById('imp_material').value;
+  const mat = findMat(code);
+  const label = document.getElementById('imp_amount_label');
+  const hint = document.getElementById('imp_amount_hint');
+  if (!mat) return;
+  if (mat.unit === 'ton') {
+    label.textContent = 'จำนวนที่รับเข้า (กก.)';
+    hint.textContent = 'กรอกเป็นกิโลกรัมตามใบชั่ง ระบบจะแปลงเป็นตันให้อัตโนมัติ';
+    hint.style.display = 'block';
+  } else {
+    label.textContent = 'จำนวนที่รับเข้า (ลิตร)';
+    hint.style.display = 'none';
+  }
 }
 
 async function loadCompanies() {
@@ -144,12 +162,16 @@ async function submitImport() {
   const btn = document.getElementById('impBtn');
   const date = document.getElementById('imp_date').value;
   const code = document.getElementById('imp_material').value;
-  const amt = parseFloat(document.getElementById('imp_amount').value);
+  const rawAmt = parseNum(document.getElementById('imp_amount').value);
   const company = document.getElementById('imp_company').value;
   const plate = document.getElementById('imp_plate').value;
   const by = document.getElementById('imp_by').value;
 
-  if (!Number.isFinite(amt) || amt <= 0) { showToast('กรอกจำนวนให้ถูกต้อง'); return; }
+  if (!Number.isFinite(rawAmt) || rawAmt <= 0) { showToast('กรอกจำนวนให้ถูกต้อง'); return; }
+
+  const mat = findMat(code);
+  // วัสดุหน่วยตัน (หิน 3 ชนิด) ให้กรอกเป็นกิโลกรัมตามใบชั่ง แล้วแปลงเป็นตันก่อนส่งเข้าระบบ
+  const amt = (mat && mat.unit === 'ton') ? rawAmt / 1000 : rawAmt;
 
   btn.disabled = true;
   try {
@@ -175,7 +197,7 @@ async function renderImportTable() {
     <tr>
       <td>${new Date(r.receiving_date).toLocaleDateString('th-TH')}</td>
       <td>${r.material_name}</td>
-      <td class="num">${fmt(r.amount, 0)} ${r.unit === 'ton' ? 'ตัน' : 'ล.'}</td>
+      <td class="num">${fmt(r.amount, r.unit === 'ton' ? 2 : 0)} ${r.unit === 'ton' ? 'ตัน' : 'ล.'}</td>
       <td>${r.company || '—'}</td>
       <td>${r.plate ? `<span class="badge">${r.plate}</span>` : '—'}</td>
       <td class="actions"><button class="del-btn" onclick="deleteImportLog(${r.id})" title="ลบรายการนี้">✕</button></td>
@@ -200,15 +222,15 @@ function downloadImportSummary() {
   const recent = importLogsCache.slice(0, 15);
   const rows = recent.map((r) => [
     `${r.material_name} · ${new Date(r.receiving_date).toLocaleDateString('th-TH')}`,
-    `${fmt(r.amount, 0)} ${r.unit === 'ton' ? 'ตัน' : 'ล.'} (${r.plate || '—'})`
+    `${fmt(r.amount, r.unit === 'ton' ? 2 : 0)} ${r.unit === 'ton' ? 'ตัน' : 'ล.'} (${r.plate || '—'})`
   ]);
   const totals = {};
   importLogsCache.forEach((r) => {
     const key = r.material_name;
-    if (!totals[key]) totals[key] = { amt: 0, unit: r.unit === 'ton' ? 'ตัน' : 'ล.' };
+    if (!totals[key]) totals[key] = { amt: 0, unit: r.unit === 'ton' ? 'ตัน' : 'ล.', isTon: r.unit === 'ton' };
     totals[key].amt += Number(r.amount);
   });
-  const totalRows = Object.entries(totals).map(([name, t]) => [name, fmt(t.amt, 0) + ' ' + t.unit]);
+  const totalRows = Object.entries(totals).map(([name, t]) => [name, fmt(t.amt, t.isTon ? 2 : 0) + ' ' + t.unit]);
   const sections = [
     { heading: 'ยอดรวมตามวัสดุ', rows: totalRows },
     { heading: `รายการล่าสุด (${recent.length} รายการ)`, rows }

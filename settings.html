@@ -258,7 +258,7 @@ async function saveRatio(code) {
 
 async function submitAdjust() {
   const code = document.getElementById('adj_material').value;
-  const val = parseFloat(document.getElementById('adj_value').value);
+  const val = parseNum(document.getElementById('adj_value').value);
   const reason = document.getElementById('adj_reason').value;
   if (!Number.isFinite(val) || val < 0) { showToast('กรอกจำนวนให้ถูกต้อง'); return; }
   try {

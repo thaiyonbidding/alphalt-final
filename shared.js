@@ -2,6 +2,13 @@ function fmt(n, d) {
   return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
+// อ่านค่าตัวเลขจากช่องกรอกอย่างปลอดภัย ตัดคอมม่า (,) ออกก่อนแปลงเป็นตัวเลขเสมอ
+// ป้องกันปัญหา parseFloat("2,709,080.41") ที่จะได้แค่ 2 (พังตั้งแต่คอมม่าตัวแรก)
+function parseNum(v) {
+  if (v === null || v === undefined) return NaN;
+  return parseFloat(String(v).replace(/,/g, ''));
+}
+
 function showToast(msg) {
   let t = document.getElementById('toast');
   if (!t) {

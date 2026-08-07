@@ -75,7 +75,7 @@
         <div class="rc-row"><span class="k">ผู้บันทึก</span><span class="v" id="rc_by">—</span></div>
         <div class="rc-foot">KANTHRALAK THAIYON · ASPHALT PLANT</div>
       </div>
-      <button class="btn btn-dark" onclick="downloadProductionSummary()">ดาวน์โหลดรูปสรุป</button>
+      <button class="btn btn-dark" onclick="downloadProductionSummary()">แชร์ / ดาวน์โหลดรูปสรุป</button>
     </div>
   </div>
 
@@ -131,15 +131,15 @@ function removeTankRow(btn) {
 function getTankSplits() {
   return Array.from(document.querySelectorAll('.tank-row')).map((row) => ({
     code: row.querySelector('.tank-select').value,
-    liters: parseFloat(row.querySelector('.tank-liters').value) || 0
+    liters: parseNum(row.querySelector('.tank-liters').value) || 0
   }));
 }
 
 function updateTankCheck() {
   const splits = getTankSplits();
   const sum = splits.reduce((a, s) => a + s.liters, 0);
-  const tons = parseFloat(document.getElementById('tons_produced').value);
-  const ratio = parseFloat(document.getElementById('asphalt_ratio').value);
+  const tons = parseNum(document.getElementById('tons_produced').value);
+  const ratio = parseNum(document.getElementById('asphalt_ratio').value);
   const hint = document.getElementById('tankCheckHint');
   if (!tons || !ratio) { hint.textContent = ''; return; }
   const target = tons * ratio;
@@ -161,8 +161,8 @@ function updateTankCheck() {
 const RATIOS = { stone_dust: 0.434, stone_34: 0.267, stone_38: 0.300 };
 
 function updateCalc() {
-  const tons = parseFloat(document.getElementById('tons_produced').value);
-  const ratio = parseFloat(document.getElementById('asphalt_ratio').value);
+  const tons = parseNum(document.getElementById('tons_produced').value);
+  const ratio = parseNum(document.getElementById('asphalt_ratio').value);
   const box = document.getElementById('calcBox');
   if (!tons || tons <= 0) {
     box.style.display = 'none';
@@ -179,9 +179,9 @@ function updateCalc() {
 }
 
 function updateOilCalc() {
-  const tons = parseFloat(document.getElementById('tons_produced').value);
-  const start = parseFloat(document.getElementById('oil_start').value);
-  const end = parseFloat(document.getElementById('oil_end').value);
+  const tons = parseNum(document.getElementById('tons_produced').value);
+  const start = parseNum(document.getElementById('oil_start').value);
+  const end = parseNum(document.getElementById('oil_end').value);
   const row = document.getElementById('c_oil_row');
   if (!Number.isFinite(end)) { row.style.display = 'none'; return; }
   const used = start - end;
@@ -193,9 +193,9 @@ function updateOilCalc() {
 
 async function submitEntry() {
   const btn = document.getElementById('submitBtn');
-  const tons = parseFloat(document.getElementById('tons_produced').value);
-  const ratio = parseFloat(document.getElementById('asphalt_ratio').value);
-  const oilEnd = parseFloat(document.getElementById('oil_end').value);
+  const tons = parseNum(document.getElementById('tons_produced').value);
+  const ratio = parseNum(document.getElementById('asphalt_ratio').value);
+  const oilEnd = parseNum(document.getElementById('oil_end').value);
   const date = document.getElementById('entry_date').value;
   const site = document.getElementById('job_site').value || '—';
   const by = document.getElementById('created_by').value || '—';
@@ -264,7 +264,7 @@ async function submitEntry() {
     document.getElementById('tankRows').innerHTML = '';
 
     await loadMaterials();
-    document.getElementById('oil_start').value = fmt(findMat('fuel_oil').current_stock, 1);
+    document.getElementById('oil_start').value = Number(findMat('fuel_oil').current_stock).toFixed(1);
     addTankRow();
   } catch (err) {
     showToast(err.message);
@@ -297,7 +297,7 @@ document.getElementById('entry_date').value = todayStr();
 
 (async function init() {
   await loadMaterials();
-  document.getElementById('oil_start').value = fmt(findMat('fuel_oil').current_stock, 1);
+  document.getElementById('oil_start').value = Number(findMat('fuel_oil').current_stock).toFixed(1);
   addTankRow();
 })();
 </script>
