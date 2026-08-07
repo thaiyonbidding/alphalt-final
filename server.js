@@ -25,6 +25,9 @@ async function initDb() {
 }
 
 // ---------- helpers ----------
+// ยางมะตอย 1 ตัน = 0.96 ลบ.ม. = 960 ลิตร (ใช้แปลงลิตรที่ใช้ผลิต -> ตันที่หักออกจากถัง)
+const ASPHALT_LITERS_PER_TON = 960;
+
 function toNum(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : NaN;
@@ -129,7 +132,8 @@ app.post('/api/production', async (req, res) => {
     await client.query(`UPDATE materials SET current_stock = current_stock - $1 WHERE code = 'stone_34'`, [stone34Used]);
     await client.query(`UPDATE materials SET current_stock = current_stock - $1 WHERE code = 'stone_38'`, [stone38Used]);
     for (const s of splits) {
-      await client.query(`UPDATE materials SET current_stock = current_stock - $1 WHERE code = $2`, [s.liters, s.code]);
+      const tonsToDeduct = s.liters / ASPHALT_LITERS_PER_TON;
+      await client.query(`UPDATE materials SET current_stock = current_stock - $1 WHERE code = $2`, [tonsToDeduct, s.code]);
     }
     await client.query(`UPDATE materials SET current_stock = $1 WHERE code = 'fuel_oil'`, [oilEnd]);
 
@@ -166,7 +170,8 @@ app.delete('/api/production/:id', async (req, res) => {
     await client.query(`UPDATE materials SET current_stock = current_stock + $1 WHERE code = 'stone_38'`, [log.stone_38_used]);
     const splits = log.tank_splits || [];
     for (const s of splits) {
-      await client.query(`UPDATE materials SET current_stock = current_stock + $1 WHERE code = $2`, [s.liters, s.code]);
+      const tonsToRestore = s.liters / ASPHALT_LITERS_PER_TON;
+      await client.query(`UPDATE materials SET current_stock = current_stock + $1 WHERE code = $2`, [tonsToRestore, s.code]);
     }
     if (log.oil_start !== null) {
       await client.query(`UPDATE materials SET current_stock = $1 WHERE code = 'fuel_oil'`, [log.oil_start]);

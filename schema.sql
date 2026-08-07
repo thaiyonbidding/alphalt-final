@@ -18,10 +18,10 @@ INSERT INTO materials (code, name, unit, ratio_per_ton, low_stock_alert, display
   ('stone_dust', 'หินฝุ่น',        'ton',   0.434, 100,  1),
   ('stone_34',   'หิน 3/4',        'ton',   0.267, 80,   2),
   ('stone_38',   'หิน 3/8',        'ton',   0.300, 80,   3),
-  ('asphalt_1',  'ถัง 1', 'liter', NULL,  2500, 4),
-  ('asphalt_2',  'ถัง 2', 'liter', NULL,  2500, 5),
-  ('asphalt_3',  'ถัง 3', 'liter', NULL,  2500, 6),
-  ('asphalt_4',  'ถัง 4', 'liter', NULL,  2500, 7),
+  ('asphalt_1',  'ถัง 1', 'ton', NULL,  2.5,  4),
+  ('asphalt_2',  'ถัง 2', 'ton', NULL,  2.5,  5),
+  ('asphalt_3',  'ถัง 3', 'ton', NULL,  2.5,  6),
+  ('asphalt_4',  'ถัง 4', 'ton', NULL,  2.5,  7),
   ('fuel_oil',   'น้ำมันเตา',      'liter', NULL,  800,  8),
   ('diesel',     'น้ำมันดีเซล',    'liter', NULL,  500,  9)
 ON CONFLICT (code) DO NOTHING;
@@ -106,3 +106,8 @@ UPDATE materials SET name = 'ถัง 1' WHERE code = 'asphalt_1';
 UPDATE materials SET name = 'ถัง 2' WHERE code = 'asphalt_2';
 UPDATE materials SET name = 'ถัง 3' WHERE code = 'asphalt_3';
 UPDATE materials SET name = 'ถัง 4' WHERE code = 'asphalt_4';
+
+-- เปลี่ยนหน่วยถังยางมะตอยจากลิตรเป็นตัน (รับเข้า/สต็อกเป็นตัน, บันทึกผลิตยังกรอกลิตรเหมือนเดิม)
+-- หมายเหตุ: ไม่แตะยอดสต็อกเดิม (current_stock) เพราะตัวเลขเดิมเป็นหน่วยลิตร
+-- ต้องไปตั้งยอดสต็อกที่ถูกต้อง (หน่วยตัน) ผ่านหน้า "ปรับสต็อกด้วยมือ" อีกครั้งหลัง deploy
+UPDATE materials SET unit = 'ton', low_stock_alert = 2.5 WHERE code IN ('asphalt_1','asphalt_2','asphalt_3','asphalt_4') AND unit = 'liter';

@@ -100,7 +100,7 @@ function findMat(code) { return materials.find((m) => m.code === code); }
 
 function tankOptionsHtml(selectedCode) {
   return materials.filter((m) => m.code.startsWith('asphalt_')).map((m) =>
-    `<option value="${m.code}" ${m.code === selectedCode ? 'selected' : ''}>${m.name} (เหลือ ${fmt(m.current_stock, 0)} ล.)</option>`
+    `<option value="${m.code}" ${m.code === selectedCode ? 'selected' : ''}>${m.name} (เหลือ ${fmt(m.current_stock, m.unit === 'ton' ? 2 : 0)} ${m.unit === 'ton' ? 'ตัน' : 'ล.'})</option>`
   ).join('');
 }
 

@@ -111,7 +111,7 @@ function downloadStockSummary() {
   const stoneRows = materials.filter((m) => ['stone_dust', 'stone_34', 'stone_38'].includes(m.code))
     .map((m) => [m.name, fmt(m.current_stock, 1) + ' ตัน']);
   const asphaltRows = materials.filter((m) => m.code.startsWith('asphalt_'))
-    .map((m) => [m.name, fmt(m.current_stock, 0) + ' ลิตร']);
+    .map((m) => [m.name, fmt(m.current_stock, m.unit === 'ton' ? 2 : 0) + ' ' + (m.unit === 'ton' ? 'ตัน' : 'ลิตร')]);
   const oilRows = materials.filter((m) => ['diesel', 'fuel_oil'].includes(m.code))
     .map((m) => [m.name, fmt(m.current_stock, 0) + ' ลิตร']);
   const sections = [
