@@ -27,12 +27,12 @@
       <label>ผลิตรวมกี่ตัน</label>
       <input type="text" inputmode="decimal" id="tons_produced" placeholder="เช่น 50">
 
-      <label>อัตราส่วนยางมะตอย (ลิตร / ตัน)</label>
+      <label>อัตราส่วนยางมะตอย (กก. / ตัน)</label>
       <input type="text" inputmode="decimal" id="asphalt_ratio" placeholder="เช่น 45">
+      <div class="hint" id="asphaltTargetHint" style="margin-top:4px;"></div>
 
-      <label>ถังยางมะตอยที่ใช้วันนี้</label>
+      <label>ระดับยางมะตอยแต่ละถัง (ตัน) — กรอกครบทั้ง 4 ถัง</label>
       <div id="tankRows"></div>
-      <button type="button" class="btn btn-outline" style="margin-top:8px;padding:11px;font-size:13px;" onclick="addTankRow()">+ เพิ่มถัง (ถ้าใช้มากกว่า 1 ถัง)</button>
       <div class="hint" id="tankCheckHint" style="margin-top:8px;"></div>
 
       <label>ระดับน้ำมันเตา ต้นวัน (ลิตร)</label>
@@ -70,8 +70,9 @@
         <div class="rc-row"><span class="k">หินฝุ่น</span><span class="v" id="rc_sd">—</span></div>
         <div class="rc-row"><span class="k">หิน 3/4</span><span class="v" id="rc_34">—</span></div>
         <div class="rc-row"><span class="k">หิน 3/8</span><span class="v" id="rc_38">—</span></div>
-        <div class="rc-row"><span class="k">ยางมะตอย</span><span class="v" id="rc_asp">—</span></div>
-        <div class="rc-row"><span class="k">ดึงจากถัง</span><span class="v" id="rc_tank">—</span></div>
+        <div class="rc-row"><span class="k">ยางมะตอยใช้ไป (รวม)</span><span class="v" id="rc_asp">—</span></div>
+        <div class="rc-row"><span class="k">เทียบกับสูตร</span><span class="v" id="rc_diff">—</span></div>
+        <div class="rc-row"><span class="k">รายละเอียดถัง</span><span class="v" id="rc_tank">—</span></div>
         <div class="rc-row"><span class="k">น้ำมันเตา</span><span class="v" id="rc_oil">—</span></div>
         <div class="rc-row"><span class="k">ผู้บันทึก</span><span class="v" id="rc_by">—</span></div>
         <div class="rc-foot">KANTHRALAK THAIYON · ASPHALT PLANT</div>
@@ -98,63 +99,73 @@ async function loadMaterials() {
 
 function findMat(code) { return materials.find((m) => m.code === code); }
 
-function tankOptionsHtml(selectedCode) {
-  return materials.filter((m) => m.code.startsWith('asphalt_')).map((m) =>
-    `<option value="${m.code}" ${m.code === selectedCode ? 'selected' : ''}>${m.name} (เหลือ ${fmt(m.current_stock, m.unit === 'ton' ? 2 : 0)} ${m.unit === 'ton' ? 'ตัน' : 'ล.'})</option>`
-  ).join('');
-}
+const TANK_CODES = ['asphalt_1', 'asphalt_2', 'asphalt_3', 'asphalt_4'];
 
-function addTankRow(selectedCode, liters) {
+function renderTankRows() {
   const wrap = document.getElementById('tankRows');
-  const row = document.createElement('div');
-  row.className = 'tank-row';
-  const usedCodes = Array.from(document.querySelectorAll('.tank-select')).map((s) => s.value);
-  const firstMats = materials.filter((m) => m.code.startsWith('asphalt_'));
-  const defaultCode = selectedCode || firstMats.find((m) => !usedCodes.includes(m.code))?.code || firstMats[0].code;
-  row.innerHTML = `
-    <select class="tank-select">${tankOptionsHtml(defaultCode)}</select>
-    <input type="text" inputmode="decimal" class="tank-liters" placeholder="ลิตร" value="${liters || ''}">
-    <button type="button" class="rm-btn" onclick="removeTankRow(this)" title="ลบแถวนี้">×</button>
-  `;
-  wrap.appendChild(row);
-  row.querySelector('.tank-select').addEventListener('change', updateTankCheck);
-  row.querySelector('.tank-liters').addEventListener('input', updateTankCheck);
-  updateTankCheck();
+  wrap.innerHTML = TANK_CODES.map((code) => {
+    const mat = findMat(code);
+    const startVal = mat ? Number(mat.current_stock).toFixed(2) : '0.00';
+    return `
+      <div style="border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;">${mat ? mat.name : code}</div>
+        <div class="tank-row" style="margin-bottom:0;">
+          <div style="flex:1;">
+            <label style="margin:0 0 4px;font-size:11px;">ต้นวัน (ตัน)</label>
+            <input type="text" class="tank-start" value="${startVal}" readonly style="background:var(--card-soft);color:var(--ink-soft);">
+          </div>
+          <div style="flex:1;">
+            <label style="margin:0 0 4px;font-size:11px;">สิ้นวัน (ตัน)</label>
+            <input type="text" inputmode="decimal" class="tank-end" data-code="${code}" placeholder="${startVal}">
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  document.querySelectorAll('.tank-end').forEach((el) => el.addEventListener('input', updateTankCheck));
 }
 
-function removeTankRow(btn) {
-  const rows = document.querySelectorAll('.tank-row');
-  if (rows.length <= 1) { showToast('ต้องมีอย่างน้อย 1 ถัง'); return; }
-  btn.closest('.tank-row').remove();
-  updateTankCheck();
-}
-
-function getTankSplits() {
-  return Array.from(document.querySelectorAll('.tank-row')).map((row) => ({
-    code: row.querySelector('.tank-select').value,
-    liters: parseNum(row.querySelector('.tank-liters').value) || 0
-  }));
+function getTankEnds() {
+  const result = {};
+  document.querySelectorAll('.tank-end').forEach((el) => {
+    result[el.dataset.code] = el.value;
+  });
+  return result;
 }
 
 function updateTankCheck() {
-  const splits = getTankSplits();
-  const sum = splits.reduce((a, s) => a + s.liters, 0);
   const tons = parseNum(document.getElementById('tons_produced').value);
   const ratio = parseNum(document.getElementById('asphalt_ratio').value);
   const hint = document.getElementById('tankCheckHint');
+
+  let totalUsed = 0;
+  let anyFilled = false;
+  let allFilled = true;
+  document.querySelectorAll('.tank-row').forEach((row) => {
+    const start = parseNum(row.querySelector('.tank-start').value);
+    const endInput = row.querySelector('.tank-end');
+    const end = parseNum(endInput.value);
+    if (endInput.value.trim() === '') { allFilled = false; return; }
+    anyFilled = true;
+    if (Number.isFinite(end)) totalUsed += (start - end);
+  });
+
   if (!tons || !ratio) { hint.textContent = ''; return; }
-  const target = tons * ratio;
-  const diff = sum - target;
-  if (sum === 0) {
-    hint.textContent = `ยอดตามสูตร ${fmt(target, 1)} ลิตร — ยังไม่ได้กรอกยอดแยกถัง`;
+  const targetKg = tons * ratio;
+  const usedKg = totalUsed * 1000;
+
+  if (!anyFilled) {
+    hint.textContent = `ยอดตามสูตร ${fmt(targetKg, 0)} กก. — ยังไม่ได้กรอกระดับถัง`;
     hint.style.color = 'var(--muted)';
     return;
   }
-  if (Math.abs(diff) < 0.5) {
-    hint.textContent = `รวม ${fmt(sum, 1)} ลิตร ตรงกับยอดตามสูตร (${fmt(target, 1)} ลิตร)`;
+  const diffKg = usedKg - targetKg;
+  const prefix = allFilled ? '' : '(กรอกยังไม่ครบ 4 ถัง) ';
+  if (Math.abs(diffKg) < 5) {
+    hint.textContent = `${prefix}ใช้ไปรวม ${fmt(usedKg, 0)} กก. ตรงกับยอดตามสูตร (${fmt(targetKg, 0)} กก.)`;
     hint.style.color = 'var(--good)';
   } else {
-    hint.textContent = `รวม ${fmt(sum, 1)} ลิตร ต่างจากยอดตามสูตร ${fmt(target, 1)} ลิตร อยู่ ${diff > 0 ? '+' : ''}${fmt(diff, 1)} ลิตร`;
+    hint.textContent = `${prefix}ใช้ไปรวม ${fmt(usedKg, 0)} กก. ต่างจากยอดตามสูตร ${fmt(targetKg, 0)} กก. อยู่ ${diffKg > 0 ? '+' : ''}${fmt(diffKg, 0)} กก.`;
     hint.style.color = 'var(--warn)';
   }
 }
@@ -174,7 +185,7 @@ function updateCalc() {
   document.getElementById('c_sd').textContent = fmt(tons * RATIOS.stone_dust, 2) + ' ตัน';
   document.getElementById('c_34').textContent = fmt(tons * RATIOS.stone_34, 2) + ' ตัน';
   document.getElementById('c_38').textContent = fmt(tons * RATIOS.stone_38, 2) + ' ตัน';
-  document.getElementById('c_asp').textContent = ratio ? fmt(tons * ratio, 1) + ' ลิตร' : '—';
+  document.getElementById('c_asp').textContent = ratio ? fmt(tons * ratio, 0) + ' กก.' : '—';
   updateOilCalc();
   updateTankCheck();
 }
@@ -200,7 +211,7 @@ async function submitEntry() {
   const date = document.getElementById('entry_date').value;
   const site = document.getElementById('job_site').value || '—';
   const by = document.getElementById('created_by').value || '—';
-  const splits = getTankSplits().filter((s) => s.liters > 0);
+  const tankEnds = getTankEnds();
 
   if (!tons || tons <= 0 || !Number.isFinite(ratio) || ratio < 0) {
     showToast('กรอกตันและอัตราส่วนยางมะตอยให้ครบ');
@@ -210,9 +221,11 @@ async function submitEntry() {
     showToast('กรอกระดับน้ำมันเตาสิ้นวันให้ครบ');
     return;
   }
-  if (splits.length === 0) {
-    showToast('กรอกลิตรที่ใช้ในแต่ละถังอย่างน้อย 1 ถัง');
-    return;
+  for (const code of TANK_CODES) {
+    if (!tankEnds[code] || tankEnds[code].trim() === '' || !Number.isFinite(parseNum(tankEnds[code]))) {
+      showToast('กรอกระดับสิ้นวันให้ครบทั้ง 4 ถัง');
+      return;
+    }
   }
 
   btn.disabled = true;
@@ -224,7 +237,7 @@ async function submitEntry() {
         production_date: date,
         tons_produced: tons,
         asphalt_ratio_per_ton: ratio,
-        tank_splits: splits,
+        tank_ends: tankEnds,
         oil_end: oilEnd,
         job_site: site,
         created_by: by
@@ -234,7 +247,18 @@ async function submitEntry() {
     const log = data.log;
     showToast('บันทึกสำเร็จ ตัดสต็อกเรียบร้อย');
 
-    const tankSummary = splits.map((s) => `${findMat(s.code).name} ${fmt(s.liters, 1)} ล.`).join(', ');
+    const tankReadings = log.tank_splits || [];
+    const tankSummary = tankReadings.map((t) => {
+      const mat = findMat(t.code);
+      return `${mat ? mat.name : t.code} ${fmt(t.start, 2)}→${fmt(t.end, 2)} ตัน (ใช้ ${fmt(t.used, 2)} ตัน)`;
+    }).join(' | ');
+
+    const targetKg = Number(data.targetKg);
+    const diffKg = Number(data.diffKg);
+    const diffText = Math.abs(diffKg) < 5
+      ? `ตรงกับสูตร (${fmt(targetKg, 0)} กก.)`
+      : `${diffKg > 0 ? '+' : ''}${fmt(diffKg, 0)} กก. จากสูตร ${fmt(targetKg, 0)} กก.`;
+
     lastSummary = {
       date, tons,
       site, by,
@@ -242,7 +266,9 @@ async function submitEntry() {
       s34: Number(log.stone_34_used),
       s38: Number(log.stone_38_used),
       asp: Number(log.asphalt_used),
+      tankReadings,
       tankSummary,
+      diffText,
       oilUsed: Number(log.oil_used),
       oilRatio: tons > 0 ? Number(log.oil_used) / tons : 0
     };
@@ -253,7 +279,8 @@ async function submitEntry() {
     document.getElementById('rc_sd').textContent = fmt(lastSummary.sd, 2) + ' ตัน';
     document.getElementById('rc_34').textContent = fmt(lastSummary.s34, 2) + ' ตัน';
     document.getElementById('rc_38').textContent = fmt(lastSummary.s38, 2) + ' ตัน';
-    document.getElementById('rc_asp').textContent = fmt(lastSummary.asp, 1) + ' ลิตร';
+    document.getElementById('rc_asp').textContent = fmt(lastSummary.asp, 0) + ' กก.';
+    document.getElementById('rc_diff').textContent = diffText;
     document.getElementById('rc_tank').textContent = tankSummary;
     document.getElementById('rc_oil').textContent = fmt(lastSummary.oilUsed, 1) + ' ลิตร (' + fmt(lastSummary.oilRatio, 2) + ' ล./ตัน)';
     document.getElementById('rc_by').textContent = by;
@@ -262,11 +289,11 @@ async function submitEntry() {
     ['tons_produced', 'asphalt_ratio', 'job_site'].forEach((id) => { document.getElementById(id).value = ''; });
     document.getElementById('oil_end').value = '';
     document.getElementById('calcBox').style.display = 'none';
-    document.getElementById('tankRows').innerHTML = '';
+    document.getElementById('tankCheckHint').textContent = '';
 
     await loadMaterials();
     document.getElementById('oil_start').value = Number(findMat('fuel_oil').current_stock).toFixed(1);
-    addTankRow();
+    renderTankRows();
   } catch (err) {
     showToast(err.message);
   } finally {
@@ -277,6 +304,10 @@ async function submitEntry() {
 function downloadProductionSummary() {
   if (!lastSummary) { showToast('กรุณาบันทึกข้อมูลก่อน'); return; }
   const s = lastSummary;
+  const tankRows = (s.tankReadings || []).map((t) => {
+    const mat = findMat(t.code);
+    return [mat ? mat.name : t.code, `${fmt(t.start, 2)} → ${fmt(t.end, 2)} ตัน (ใช้ ${fmt(t.used, 2)} ตัน)`];
+  });
   const sections = [
     { heading: 'ข้อมูลทั่วไป', rows: [['หน้างาน', s.site], ['ผู้บันทึก', s.by]] },
     { heading: 'วัตถุดิบหิน', rows: [
@@ -284,7 +315,8 @@ function downloadProductionSummary() {
       ['หิน 3/4', fmt(s.s34, 2) + ' ตัน'],
       ['หิน 3/8', fmt(s.s38, 2) + ' ตัน']
     ]},
-    { heading: 'ยางมะตอย', rows: [['ยอดรวมที่ใช้', fmt(s.asp, 1) + ' ลิตร'], ['ดึงจากถัง', s.tankSummary]] },
+    { heading: 'ยางมะตอย', rows: [['ยอดรวมที่ใช้', fmt(s.asp, 0) + ' กก.'], ['เทียบกับสูตร', s.diffText]] },
+    { heading: 'ระดับถังยางมะตอย', rows: tankRows },
     { heading: 'น้ำมันเตา', rows: [['ใช้ไป', fmt(s.oilUsed, 1) + ' ล. (' + fmt(s.oilRatio, 2) + ' ล./ตัน)']] }
   ];
   const canvas = buildReceiptCanvas('สรุปการผลิตประจำวัน', 'ผลผลิตวันนี้', fmt(s.tons, 0) + ' ตัน', sections, 'บันทึกประจำวัน · ' + s.date);
@@ -300,7 +332,7 @@ attachDateHint('entry_date', 'entry_date_hint');
 (async function init() {
   await loadMaterials();
   document.getElementById('oil_start').value = Number(findMat('fuel_oil').current_stock).toFixed(1);
-  addTankRow();
+  renderTankRows();
 })();
 </script>
 
