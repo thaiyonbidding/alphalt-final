@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>นำเข้าวัสดุ | โรงงานยางมะตอย</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="app-shell">
+<div class="sidebar" id="sidebar"></div>
+<div class="main-scroll">
+
+  <div class="topbar">
+    <p class="eyebrow">กันทรลักษ์ไทยนต์ · แพล้นยาง</p>
+    <h1>นำเข้าวัสดุ</h1>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2>บันทึกรับเข้า</h2>
+      <label>วันที่รับ</label>
+      <input type="date" id="imp_date">
+      <p class="hint" id="imp_date_hint"></p>
+
+      <label>วัสดุ</label>
+      <select id="imp_material" onchange="updateAmountLabel()"></select>
+
+      <label id="imp_amount_label">จำนวนที่รับเข้า</label>
+      <input type="text" inputmode="decimal" id="imp_amount" placeholder="0">
+      <p class="hint" id="imp_amount_hint" style="display:none;"></p>
+
+      <label>บริษัทผู้ขาย</label>
+      <div class="inline-add">
+        <div><select id="imp_company"></select></div>
+        <button type="button" onclick="toggleAddRow('addCompanyRow')">+ เพิ่ม</button>
+      </div>
+      <div class="add-row" id="addCompanyRow">
+        <input type="text" id="newCompanyInput" placeholder="พิมพ์ชื่อบริษัทใหม่">
+        <button type="button" onclick="confirmAddCompany()">เพิ่ม</button>
+      </div>
+
+      <label>ทะเบียนรถ</label>
+      <div class="inline-add">
+        <div><select id="imp_plate"></select></div>
+        <button type="button" onclick="toggleAddRow('addPlateRow')">+ เพิ่ม</button>
+      </div>
+      <div class="add-row" id="addPlateRow">
+        <input type="text" id="newPlateInput" placeholder="เช่น กท 1234 อุบล">
+        <button type="button" onclick="confirmAddPlate()">เพิ่ม</button>
+      </div>
+
+      <label>ผู้บันทึก</label>
+      <input type="text" id="imp_by" placeholder="ชื่อผู้กรอก">
+
+      <button class="btn btn-primary" id="impBtn" onclick="submitImport()">บันทึกรับเข้า</button>
+    </div>
+
+    <div class="card">
+      <h2>ประวัติการนำเข้า</h2>
+      <p class="hint" style="margin-top:-6px;margin-bottom:10px;">เลือกช่วงวันที่เพื่อกรองตาราง/รูปสรุป (เว้นว่างไว้ = แสดงทั้งหมด)</p>
+      <label>ตั้งแต่วันที่</label>
+      <input type="date" id="filter_from">
+      <p class="hint" id="filter_from_hint"></p>
+      <label>ถึงวันที่</label>
+      <input type="date" id="filter_to">
+      <p class="hint" id="filter_to_hint"></p>
+      <div class="inline-add" style="margin-top:10px;">
+        <div></div>
+        <button type="button" onclick="setFilterThisMonth()">เดือนนี้</button>
+        <button type="button" onclick="clearFilter()">ล้างตัวกรอง</button>
+      </div>
+
+      <div class="print-only" id="printHeader">
+        <h1>สรุปการนำเข้าวัสดุ</h1>
+        <p>KANTHRALAK THAIYON · ASPHALT PLANT</p>
+        <p id="printPeriod"></p>
+      </div>
+
+      <table style="margin-top:16px;">
+        <thead><tr><th>วันที่</th><th>วัสดุ</th><th class="num">จำนวน</th><th>บริษัท</th><th>ทะเบียน</th><th class="actions"></th></tr></thead>
+        <tbody id="importTable"></tbody>
+      </table>
+      <button class="btn btn-dark" onclick="downloadImportSummary()">แชร์ / ดาวน์โหลดรูปสรุปการนำเข้า</button>
+      <button class="btn btn-outline" onclick="printImportTable()">🖨 พิมพ์ตารางนี้</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<nav class="navbar" id="navbar"></nav>
+
+<script src="/shared.js"></script>
+<script>
+renderNav('import');
+
+let materials = [];
+let importLogsCache = [];
+
+function findMat(code) { return materials.find((m) => m.code === code); }
+
+async function loadMaterials() {
+  materials = await apiFetch('/api/materials');
+  document.getElementById('imp_material').innerHTML = materials.map((m) =>
+    `<option value="${m.code}">${m.name} (${m.unit === 'ton' ? 'ตัน' : 'ลิตร'})</option>`
+  ).join('');
+  updateAmountLabel();
+}
+
+// วัสดุที่ต้องกรอกเป็นกิโลกรัมแล้วแปลงเป็นหน่วยสต็อกให้อัตโนมัติ
+// stone_dust/34/38: กก. -> ตัน (หาร 1000)
+// fuel_oil (น้ำมันเตา): กก. -> ลิตร (หาร 0.93 ตามความหนาแน่น)
+function getKgConversionFactor(mat) {
+  if (!mat) return null;
+  if (mat.unit === 'ton') return 1000;
+  if (mat.code === 'fuel_oil') return 0.93;
+  return null;
+}
+
+function updateAmountLabel() {
+  const code = document.getElementById('imp_material').value;
+  const mat = findMat(code);
+  const label = document.getElementById('imp_amount_label');
+  const hint = document.getElementById('imp_amount_hint');
+  if (!mat) return;
+  const factor = getKgConversionFactor(mat);
+  if (factor) {
+    label.textContent = 'จำนวนที่รับเข้า (กก.)';
+    hint.textContent = mat.code === 'fuel_oil'
+      ? 'กรอกเป็นกิโลกรัม ระบบจะแปลงเป็นลิตรให้อัตโนมัติ (หาร 0.93)'
+      : 'กรอกเป็นกิโลกรัมตามใบชั่ง ระบบจะแปลงเป็นตันให้อัตโนมัติ';
+    hint.style.display = 'block';
+  } else {
+    label.textContent = `จำนวนที่รับเข้า (${mat.unit === 'ton' ? 'ตัน' : 'ลิตร'})`;
+    hint.style.display = 'none';
+  }
+}
+
+async function loadCompanies() {
+  const companies = await apiFetch('/api/companies');
+  document.getElementById('imp_company').innerHTML = companies.map((c) => `<option value="${c}">${c}</option>`).join('')
+    || '<option value="">ยังไม่มีบริษัท</option>';
+}
+
+async function loadPlates() {
+  const plates = await apiFetch('/api/plates');
+  document.getElementById('imp_plate').innerHTML = plates.map((p) => `<option value="${p}">${p}</option>`).join('')
+    || '<option value="">ยังไม่มีทะเบียน</option>';
+}
+
+function toggleAddRow(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) el.querySelector('input').focus();
+}
+
+async function confirmAddCompany() {
+  const input = document.getElementById('newCompanyInput');
+  const name = input.value.trim();
+  if (!name) { showToast('พิมพ์ชื่อบริษัทก่อน'); return; }
+  try {
+    await apiFetch('/api/companies', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
+    });
+    await loadCompanies();
+    document.getElementById('imp_company').value = name;
+    input.value = '';
+    document.getElementById('addCompanyRow').classList.remove('open');
+    showToast('เพิ่มบริษัทแล้ว');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function confirmAddPlate() {
+  const input = document.getElementById('newPlateInput');
+  const plate = input.value.trim();
+  if (!plate) { showToast('พิมพ์ทะเบียนก่อน'); return; }
+  try {
+    await apiFetch('/api/plates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plate })
+    });
+    await loadPlates();
+    document.getElementById('imp_plate').value = plate;
+    input.value = '';
+    document.getElementById('addPlateRow').classList.remove('open');
+    showToast('เพิ่มทะเบียนแล้ว');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function submitImport() {
+  const btn = document.getElementById('impBtn');
+  const date = document.getElementById('imp_date').value;
+  const code = document.getElementById('imp_material').value;
+  const rawAmt = parseNum(document.getElementById('imp_amount').value);
+  const company = document.getElementById('imp_company').value;
+  const plate = document.getElementById('imp_plate').value;
+  const by = document.getElementById('imp_by').value;
+
+  if (!Number.isFinite(rawAmt) || rawAmt <= 0) { showToast('กรอกจำนวนให้ถูกต้อง'); return; }
+
+  const mat = findMat(code);
+  // แปลงจากกิโลกรัมเป็นหน่วยสต็อกจริงถ้าวัสดุนี้ต้องแปลง (หิน = หาร 1000, น้ำมันเตา = หาร 0.93)
+  const factor = getKgConversionFactor(mat);
+  const amt = factor ? rawAmt / factor : rawAmt;
+
+  btn.disabled = true;
+  try {
+    await apiFetch('/api/receiving', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ material_code: code, amount: amt, company, plate, receiving_date: date, created_by: by })
+    });
+    showToast('บันทึกรับเข้าสำเร็จ');
+    document.getElementById('imp_amount').value = '';
+    await loadMaterials();
+    await renderImportTable();
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+let allImportLogs = [];
+
+function getFilteredLogs() {
+  const from = document.getElementById('filter_from').value;
+  const to = document.getElementById('filter_to').value;
+  return allImportLogs.filter((r) => {
+    const d = r.receiving_date.slice(0, 10);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+}
+
+function setFilterThisMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('filter_from').value = first.toISOString().slice(0, 10);
+  document.getElementById('filter_to').value = todayStr();
+  attachDateHint('filter_from', 'filter_from_hint');
+  attachDateHint('filter_to', 'filter_to_hint');
+  renderImportTable();
+}
+
+function clearFilter() {
+  document.getElementById('filter_from').value = '';
+  document.getElementById('filter_to').value = '';
+  document.getElementById('filter_from_hint').textContent = '';
+  document.getElementById('filter_to_hint').textContent = '';
+  renderImportTable();
+}
+
+function getUnitLabel(r) { return r.unit === 'ton' ? 'ตัน' : 'ล.'; }
+function getAmountDecimals(r) { return (r.unit === 'ton' || r.material_code === 'fuel_oil') ? 2 : 0; }
+
+async function renderImportTable() {
+  allImportLogs = await apiFetch('/api/logs/receiving');
+  importLogsCache = getFilteredLogs();
+  document.getElementById('importTable').innerHTML = importLogsCache.map((r) => `
+    <tr>
+      <td>${new Date(r.receiving_date).toLocaleDateString('th-TH')}</td>
+      <td>${r.material_name}</td>
+      <td class="num">${fmt(r.amount, getAmountDecimals(r))} ${getUnitLabel(r)}</td>
+      <td>${r.company || '—'}</td>
+      <td>${r.plate ? `<span class="badge">${r.plate}</span>` : '—'}</td>
+      <td class="actions"><button class="del-btn" onclick="deleteImportLog(${r.id})" title="ลบรายการนี้">✕</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="6">ไม่มีข้อมูลในช่วงที่เลือก</td></tr>';
+}
+
+async function deleteImportLog(id) {
+  if (!confirm('ลบรายการนี้และปรับสต็อกกลับหรือไม่?')) return;
+  try {
+    await apiFetch('/api/receiving/' + id, { method: 'DELETE' });
+    showToast('ลบรายการและปรับสต็อกกลับแล้ว');
+    await loadMaterials();
+    await renderImportTable();
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function downloadImportSummary() {
+  if (importLogsCache.length === 0) { showToast('ไม่มีรายการในช่วงที่เลือก'); return; }
+  const from = document.getElementById('filter_from').value;
+  const to = document.getElementById('filter_to').value;
+  const periodLabel = (from || to)
+    ? `ช่วง ${from ? new Date(from).toLocaleDateString('th-TH') : 'เริ่มต้น'} – ${to ? new Date(to).toLocaleDateString('th-TH') : 'ปัจจุบัน'}`
+    : 'ทั้งหมด';
+
+  const ROWS_PER_PAGE = 35;
+  const allRows = importLogsCache.map((r) => [
+    `${r.material_name} · ${new Date(r.receiving_date).toLocaleDateString('th-TH')}`,
+    `${fmt(r.amount, getAmountDecimals(r))} ${getUnitLabel(r)} (${r.plate || '—'})`
+  ]);
+
+  const pageCount = Math.ceil(allRows.length / ROWS_PER_PAGE);
+  const canvases = [];
+  for (let p = 0; p < pageCount; p++) {
+    const pageRows = allRows.slice(p * ROWS_PER_PAGE, (p + 1) * ROWS_PER_PAGE);
+    const pageTitle = pageCount > 1 ? `สรุปการนำเข้าวัสดุ (${p + 1}/${pageCount})` : 'สรุปการนำเข้าวัสดุ';
+    const sections = [
+      { heading: `รายการ (${importLogsCache.length} รายการทั้งหมด)`, rows: pageRows }
+    ];
+    canvases.push(buildReceiptCanvas(pageTitle, null, null, sections, periodLabel));
+  }
+
+  if (canvases.length === 1) {
+    triggerDownload(canvases[0], 'สรุปนำเข้า-' + todayStr() + '.png');
+  } else {
+    triggerMultiDownload(canvases, 'สรุปนำเข้า-' + todayStr());
+  }
+}
+
+function printImportTable() {
+  if (importLogsCache.length === 0) { showToast('ไม่มีรายการในช่วงที่เลือก'); return; }
+  const from = document.getElementById('filter_from').value;
+  const to = document.getElementById('filter_to').value;
+  const periodLabel = (from || to)
+    ? `ช่วง ${from ? new Date(from).toLocaleDateString('th-TH') : 'เริ่มต้น'} – ${to ? new Date(to).toLocaleDateString('th-TH') : 'ปัจจุบัน'}`
+    : 'ทั้งหมด';
+  document.getElementById('printPeriod').textContent = periodLabel + ' · พิมพ์เมื่อ ' + new Date().toLocaleString('th-TH');
+  window.print();
+}
+
+document.getElementById('imp_date').value = todayStr();
+
+(async function init() {
+  attachDateHint('imp_date', 'imp_date_hint');
+  attachDateHint('filter_from', 'filter_from_hint');
+  attachDateHint('filter_to', 'filter_to_hint');
+  document.getElementById('filter_from').addEventListener('change', renderImportTable);
+  document.getElementById('filter_to').addEventListener('change', renderImportTable);
+  await loadMaterials();
+  await loadCompanies();
+  await loadPlates();
+  await renderImportTable();
+})();
+</script>
+
+</body>
+</html>

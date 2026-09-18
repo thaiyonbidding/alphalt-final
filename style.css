@@ -166,3 +166,22 @@ th.actions, td.actions { width: 34px; text-align: center; }
   .container { padding: 6px 36px 32px; max-width: 640px; }
   .stock-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ---------- โหมดพิมพ์ (window.print) ---------- */
+.print-only { display: none; }
+
+@media print {
+  body { padding: 0; background: #fff; }
+  .app-shell { display: block; box-shadow: none; border-radius: 0; max-width: 100%; }
+  .sidebar, .navbar, .topbar, .btn, .inline-add, .add-row, .hint, .actions,
+  input, select, label:not(.print-keep), .card > h2 { display: none !important; }
+  .container { padding: 0; max-width: 100%; }
+  .card { border: none; box-shadow: none; padding: 0; margin: 0; }
+  .print-only { display: block; margin-bottom: 16px; }
+  .print-only h1 { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; }
+  .print-only p { font-family: var(--font-mono); font-size: 11px; color: #555; margin: 2px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #999; padding: 6px 8px; font-size: 11px; }
+  th { background: #eee; }
+  .stock-card { border: 1px solid #999; break-inside: avoid; }
+}
