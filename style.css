@@ -150,7 +150,7 @@ th.actions, td.actions { width: 34px; text-align: center; }
 .receipt .rc-row .v { font-family: var(--font-mono); font-weight: 600; }
 .receipt .rc-foot { text-align: center; font-size: 10px; color: #A29C93; margin-top: 16px; font-family: var(--font-mono); letter-spacing: 0.04em; }
 
-@media (min-width: 900px) {
+@media screen and (min-width: 900px) {
   body { padding: 32px 16px; }
   .app-shell { max-width: 980px; margin: 0 auto; display: flex; align-items: stretch; background: var(--bg); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 34px rgba(0,0,0,0.08); }
   .sidebar { display: flex; width: 220px; flex-shrink: 0; background: var(--nav-dark); padding: 28px 16px; flex-direction: column; gap: 4px; }
@@ -172,7 +172,8 @@ th.actions, td.actions { width: 34px; text-align: center; }
 
 @media print {
   body { padding: 0; background: #fff; }
-  .app-shell { display: block; box-shadow: none; border-radius: 0; max-width: 100%; }
+  .app-shell { display: block !important; box-shadow: none; border-radius: 0; max-width: 100%; }
+  .main-scroll { overflow: visible !important; max-height: none !important; flex: none !important; }
   .sidebar, .navbar, .topbar, .btn, .inline-add, .add-row, .hint, .actions,
   input, select, label:not(.print-keep), .card > h2 { display: none !important; }
   .container { padding: 0; max-width: 100%; }
