@@ -152,7 +152,7 @@ th.actions, td.actions { width: 34px; text-align: center; }
 
 @media screen and (min-width: 900px) {
   body { padding: 32px 16px; }
-  .app-shell { max-width: 980px; margin: 0 auto; display: flex; align-items: stretch; background: var(--bg); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 34px rgba(0,0,0,0.08); }
+  .app-shell { max-width: 1400px; margin: 0 auto; display: flex; align-items: stretch; background: var(--bg); border-radius: 20px; overflow: hidden; box-shadow: 0 10px 34px rgba(0,0,0,0.08); }
   .sidebar { display: flex; width: 220px; flex-shrink: 0; background: var(--nav-dark); padding: 28px 16px; flex-direction: column; gap: 4px; }
   .sidebar .brand { padding: 0 10px 22px; }
   .sidebar .brand .eyebrow { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; color: #8A8479; text-transform: uppercase; }
@@ -163,8 +163,8 @@ th.actions, td.actions { width: 34px; text-align: center; }
   .main-scroll { flex: 1; overflow-y: auto; max-height: 86vh; }
   .navbar { display: none; }
   .topbar { padding: 26px 36px 16px; }
-  .container { padding: 6px 36px 32px; max-width: 640px; }
-  .stock-grid { grid-template-columns: repeat(3, 1fr); }
+  .container { padding: 6px 36px 32px; max-width: 900px; }
+  .stock-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
 /* ---------- โหมดพิมพ์ (window.print) ---------- */
