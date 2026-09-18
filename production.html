@@ -31,7 +31,7 @@
       <input type="text" inputmode="decimal" id="asphalt_ratio" placeholder="เช่น 45">
       <div class="hint" id="asphaltTargetHint" style="margin-top:4px;"></div>
 
-      <label>ระดับยางมะตอยแต่ละถัง (ตัน) — กรอกครบทั้ง 4 ถัง</label>
+      <label>ระดับยางมะตอยแต่ละถัง (ตัน) — กรอกครบทั้ง 6 ถัง</label>
       <div id="tankRows"></div>
       <div class="hint" id="tankCheckHint" style="margin-top:8px;"></div>
 
@@ -99,7 +99,7 @@ async function loadMaterials() {
 
 function findMat(code) { return materials.find((m) => m.code === code); }
 
-const TANK_CODES = ['asphalt_1', 'asphalt_2', 'asphalt_3', 'asphalt_4'];
+const TANK_CODES = ['asphalt_1', 'asphalt_2', 'asphalt_3', 'asphalt_4', 'asphalt_old_1', 'asphalt_old_2'];
 
 function renderTankRows() {
   const wrap = document.getElementById('tankRows');
@@ -223,7 +223,7 @@ async function submitEntry() {
   }
   for (const code of TANK_CODES) {
     if (!tankEnds[code] || tankEnds[code].trim() === '' || !Number.isFinite(parseNum(tankEnds[code]))) {
-      showToast('กรอกระดับสิ้นวันให้ครบทั้ง 4 ถัง');
+      showToast('กรอกระดับสิ้นวันให้ครบทั้ง 6 ถัง');
       return;
     }
   }

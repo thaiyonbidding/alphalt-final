@@ -87,7 +87,7 @@ app.post('/api/production', async (req, res) => {
   const tons = toNum(tons_produced);
   const ratio = toNum(asphalt_ratio_per_ton); // กก. / ตัน
   const oilEnd = toNum(oil_end);
-  const TANK_CODES = ['asphalt_1', 'asphalt_2', 'asphalt_3', 'asphalt_4'];
+  const TANK_CODES = ['asphalt_1', 'asphalt_2', 'asphalt_3', 'asphalt_4', 'asphalt_old_1', 'asphalt_old_2'];
 
   if (!production_date || !Number.isFinite(tons) || tons <= 0 || !Number.isFinite(ratio) || ratio < 0) {
     return res.status(400).json({ error: 'ข้อมูลไม่ครบหรือไม่ถูกต้อง (วันที่ / ตันที่ผลิต / อัตราส่วนยางมะตอย)' });
@@ -96,13 +96,13 @@ app.post('/api/production', async (req, res) => {
     return res.status(400).json({ error: 'กรอกระดับน้ำมันเตาสิ้นวันให้ถูกต้อง' });
   }
   if (!tank_ends || typeof tank_ends !== 'object') {
-    return res.status(400).json({ error: 'กรอกระดับสิ้นวันของทั้ง 4 ถังให้ครบ' });
+    return res.status(400).json({ error: 'กรอกระดับสิ้นวันของทั้ง 6 ถังให้ครบ' });
   }
   const ends = {};
   for (const code of TANK_CODES) {
     const v = toNum(tank_ends[code]);
     if (!Number.isFinite(v) || v < 0) {
-      return res.status(400).json({ error: 'กรอกระดับสิ้นวันของทั้ง 4 ถังให้ครบและถูกต้อง' });
+      return res.status(400).json({ error: 'กรอกระดับสิ้นวันของทั้ง 6 ถังให้ครบและถูกต้อง' });
     }
     ends[code] = v;
   }

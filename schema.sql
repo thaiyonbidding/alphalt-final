@@ -15,16 +15,22 @@ CREATE TABLE IF NOT EXISTS materials (
 );
 
 INSERT INTO materials (code, name, unit, ratio_per_ton, low_stock_alert, display_order) VALUES
-  ('stone_dust', 'หินฝุ่น',        'ton',   0.434, 100,  1),
-  ('stone_34',   'หิน 3/4',        'ton',   0.267, 80,   2),
-  ('stone_38',   'หิน 3/8',        'ton',   0.300, 80,   3),
-  ('asphalt_1',  'ถัง 1', 'ton', NULL,  2.5,  4),
-  ('asphalt_2',  'ถัง 2', 'ton', NULL,  2.5,  5),
-  ('asphalt_3',  'ถัง 3', 'ton', NULL,  2.5,  6),
-  ('asphalt_4',  'ถัง 4', 'ton', NULL,  2.5,  7),
-  ('fuel_oil',   'น้ำมันเตา',      'liter', NULL,  800,  8),
-  ('diesel',     'น้ำมันดีเซล',    'liter', NULL,  500,  9)
+  ('stone_dust',   'หินฝุ่น',        'ton',   0.434, 100,  1),
+  ('stone_34',     'หิน 3/4',        'ton',   0.267, 80,   2),
+  ('stone_38',     'หิน 3/8',        'ton',   0.300, 80,   3),
+  ('asphalt_1',    'ถัง 1',          'ton',   NULL,  2.5,  4),
+  ('asphalt_2',    'ถัง 2',          'ton',   NULL,  2.5,  5),
+  ('asphalt_3',    'ถัง 3',          'ton',   NULL,  2.5,  6),
+  ('asphalt_4',    'ถัง 4',          'ton',   NULL,  2.5,  7),
+  ('asphalt_old_1','ถังเก่า 1',      'ton',   NULL,  2.5,  8),
+  ('asphalt_old_2','ถังเก่า 2',      'ton',   NULL,  2.5,  9),
+  ('fuel_oil',     'น้ำมันเตา',      'liter', NULL,  800,  10),
+  ('diesel',       'น้ำมันดีเซล',    'liter', NULL,  500,  11)
 ON CONFLICT (code) DO NOTHING;
+
+-- ปรับลำดับของน้ำมันเตา/ดีเซล ให้ตามหลังถังเก่าทั้งสอง (เผื่อระบบเคยรันไปแล้วมีลำดับเดิมค้างอยู่)
+UPDATE materials SET display_order = 10 WHERE code = 'fuel_oil';
+UPDATE materials SET display_order = 11 WHERE code = 'diesel';
 
 -- บันทึกการผลิตประจำวัน (โดยทั่วไป 1 รอบ/วัน)
 CREATE TABLE IF NOT EXISTS production_logs (
