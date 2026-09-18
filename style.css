@@ -57,7 +57,14 @@ input[type="date"] {
   min-width: 0;
 }
 input:focus, select:focus { outline: none; border-color: var(--accent); }
-input[readonly] { color: var(--ink-soft); }
+input[readonly] { background: var(--line); color: var(--ink-soft); border-color: transparent; }
+.input-fill {
+  background: #FFF6DE;
+  border: 2px solid var(--accent);
+  font-weight: 700;
+}
+.input-fill:focus { border-color: var(--warn); box-shadow: 0 0 0 3px rgba(232,147,12,0.2); }
+.input-fill::placeholder { font-weight: 400; color: var(--muted); }
 
 .hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
 

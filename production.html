@@ -40,7 +40,7 @@
       <p class="hint">ดึงจากสต็อกน้ำมันเตาปัจจุบันอัตโนมัติ (คือยอดสิ้นวันของรอบก่อนหน้า)</p>
 
       <label>ระดับน้ำมันเตา สิ้นวัน (ลิตร)</label>
-      <input type="text" inputmode="decimal" id="oil_end" placeholder="เช่น 1480">
+      <input type="text" inputmode="decimal" id="oil_end" class="input-fill" placeholder="เช่น 1480">
 
       <label>หน้างาน</label>
       <input type="text" id="job_site" placeholder="เช่น ถนนบ้านตาลอง หมู่ 4">
@@ -112,11 +112,11 @@ function renderTankRows() {
         <div class="tank-row" style="margin-bottom:0;">
           <div style="flex:1;">
             <label style="margin:0 0 4px;font-size:11px;">ต้นวัน (ตัน)</label>
-            <input type="text" class="tank-start" value="${startVal}" readonly style="background:var(--card-soft);color:var(--ink-soft);">
+            <input type="text" class="tank-start" value="${startVal}" readonly>
           </div>
           <div style="flex:1;">
             <label style="margin:0 0 4px;font-size:11px;">สิ้นวัน (ตัน)</label>
-            <input type="text" inputmode="decimal" class="tank-end" data-code="${code}" placeholder="${startVal}">
+            <input type="text" inputmode="decimal" class="tank-end input-fill" data-code="${code}" placeholder="${startVal}">
           </div>
         </div>
       </div>
