@@ -72,11 +72,19 @@
         <button type="button" onclick="clearFilter()">ล้างตัวกรอง</button>
       </div>
 
+      <div class="print-only" id="printHeader">
+        <h1>สรุปการนำเข้าวัสดุ</h1>
+        <p>KANTHRALAK THAIYON · ASPHALT PLANT</p>
+        <p id="printPeriod"></p>
+      </div>
+
       <table style="margin-top:16px;">
         <thead><tr><th>วันที่</th><th>วัสดุ</th><th class="num">จำนวน</th><th>บริษัท</th><th>ทะเบียน</th><th class="actions"></th></tr></thead>
         <tbody id="importTable"></tbody>
       </table>
       <button class="btn btn-dark" onclick="downloadImportSummary()">แชร์ / ดาวน์โหลดรูปสรุปการนำเข้า</button>
+      <button class="btn btn-outline" onclick="printImportTable()">🖨 พิมพ์ตารางนี้</button>
+      <button class="btn btn-outline" onclick="downloadImportPdf()">📄 ดาวน์โหลด PDF</button>
     </div>
   </div>
 
@@ -310,6 +318,28 @@ function downloadImportSummary() {
   } else {
     triggerMultiDownload(canvases, 'สรุปนำเข้า-' + todayStr());
   }
+}
+
+function prepareImportPrintHeader() {
+  const from = document.getElementById('filter_from').value;
+  const to = document.getElementById('filter_to').value;
+  const periodLabel = (from || to)
+    ? `ช่วง ${from ? new Date(from).toLocaleDateString('th-TH') : 'เริ่มต้น'} – ${to ? new Date(to).toLocaleDateString('th-TH') : 'ปัจจุบัน'}`
+    : 'ทั้งหมด';
+  document.getElementById('printPeriod').textContent = periodLabel + ' · พิมพ์เมื่อ ' + new Date().toLocaleString('th-TH');
+}
+
+function printImportTable() {
+  if (importLogsCache.length === 0) { showToast('ไม่มีรายการในช่วงที่เลือก'); return; }
+  prepareImportPrintHeader();
+  window.print();
+}
+
+function downloadImportPdf() {
+  if (importLogsCache.length === 0) { showToast('ไม่มีรายการในช่วงที่เลือก'); return; }
+  prepareImportPrintHeader();
+  showToast('เลือก "บันทึกเป็น PDF" / "Save as PDF" ในหน้าต่างที่เปิดขึ้นมา');
+  window.print();
 }
 
 document.getElementById('imp_date').value = todayStr();
